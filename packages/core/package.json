@@ -10,7 +10,10 @@
         "clean": "rimraf dist",
         "lint": "eslint src --ext .ts",
         "lint:fix": "eslint src --ext .ts --fix",
-        "typecheck": "tsc --noEmit"
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "test:coverage": "vitest run --coverage"
     },
     "dependencies": {
         "@google/genai": "^1.9.0",
@@ -36,11 +39,10 @@
     },
     "devDependencies": {
         "@types/fs-extra": "^11.0.0",
-        "@types/jest": "^30.0.0",
-        "@types/mock-fs": "^4.13.4",
-        "jest": "^30.0.0",
-        "mock-fs": "^5.5.0",
-        "ts-jest": "^29.4.0"
+        "@types/node": "^20.0.0",
+        "@vitest/coverage-v8": "^2.1.8",
+        "memfs": "^4.14.0",
+        "vitest": "^2.1.8"
     },
     "files": [
         "dist",
