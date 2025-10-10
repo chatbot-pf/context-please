@@ -68,3 +68,5 @@ repos
 
 evaluation/retrieval_results*
 .venv/
+
+coverage/
