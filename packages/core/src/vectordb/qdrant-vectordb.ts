@@ -228,7 +228,7 @@ export class QdrantVectorDatabase extends BaseVectorDatabase<QdrantConfig> {
         await this.ensureInitialized();
 
         const response = await this.client!.api('collections').list({});
-        return response.collections.map((c: any) => c.name);
+        return response.collections.map((c: { name: string }) => c.name);
     }
 
     /**
@@ -601,17 +601,21 @@ export class QdrantVectorDatabase extends BaseVectorDatabase<QdrantConfig> {
                     .split(',')
                     .map(v => v.trim().replace(/['"]/g, ''));
 
-                // For "IN" operator, use a "should" clause with multiple keyword matches.
+                // For "IN" operator, use a "must" clause with "any" match for better performance
                 return {
-                    should: values.map(value => ({
-                        key: field,
-                        match: {
-                            value: {
-                                case: 'keyword' as const,
-                                value: { stringValue: value },
-                            },
-                        },
-                    })),
+                    must: [{
+                        field: {
+                            key: field,
+                            match: {
+                                matchValue: {
+                                    case: 'any' as const,
+                                    value: {
+                                        values: values.map(value => ({ kind: { case: 'stringValue' as const, value } }))
+                                    }
+                                }
+                            }
+                        }
+                    }]
                 };
             }
         } else if (expr.includes('==')) {
@@ -624,15 +628,15 @@ export class QdrantVectorDatabase extends BaseVectorDatabase<QdrantConfig> {
                 return {
                     must: [
                         {
-                            key: field,
-                            match: {
-                                value: {
-                                    case: 'keyword' as const,
-                                    value: {
-                                        stringValue: value,
-                                    },
-                                },
-                            },
+                            field: {
+                                key: field,
+                                match: {
+                                    matchValue: {
+                                        case: 'keyword' as const,
+                                        value: value
+                                    }
+                                }
+                            }
                         },
                     ],
                 };
