@@ -89,9 +89,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--llm_type",
         type=str,
-        choices=["openai", "ollama", "moonshot"],
+        choices=["openai", "ollama", "moonshot", "google"],
         # default="moonshot",
-        default="openai",
+        default="google",
         # default="anthropic",
         help="LLM type",
     )
@@ -99,9 +99,10 @@ if __name__ == "__main__":
         "--llm_model",
         type=str,
         # default="kimi-k2-0711-preview",
-        default="gpt-4o-mini",
+        # default="gpt-5-nano",
+        default="gemini-2.5-flash-lite",
         # default="claude-sonnet-4-20250514",
-        help="LLM model name, e.g. gpt-4o-mini",
+        help="LLM model name, e.g. gpt-5-nano",
     )
     parser.add_argument(
         "--splits", nargs="+", default=["test"], help="Dataset splits to process"
