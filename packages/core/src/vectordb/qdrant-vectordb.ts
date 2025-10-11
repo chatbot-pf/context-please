@@ -214,7 +214,14 @@ export class QdrantVectorDatabase extends BaseVectorDatabase<QdrantConfig> {
             });
             return response.result !== undefined;
         } catch (error: any) {
-            if (error.message?.includes('not found') || error.message?.includes('does not exist')) {
+            // Handle gRPC NOT_FOUND error (code 5) or check error messages
+            if (
+                error.code === 5 || // gRPC NOT_FOUND status code
+                error.rawMessage?.includes('not found') ||
+                error.rawMessage?.includes('does not exist') ||
+                error.message?.includes('not found') ||
+                error.message?.includes('does not exist')
+            ) {
                 return false;
             }
             throw error;
