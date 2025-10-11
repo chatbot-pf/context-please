@@ -13,6 +13,12 @@
         "lint": "eslint src --ext .ts",
         "lint:fix": "eslint src --ext .ts --fix",
         "typecheck": "tsc --noEmit",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "test:coverage": "vitest run --coverage",
+        "test:unit": "vitest run --config vitest.config.ts",
+        "test:integration": "vitest run --config vitest.config.integration.ts",
+        "test:all": "pnpm test:unit && pnpm test:integration",
         "start": "tsx src/index.ts",
         "start:with-env": "OPENAI_API_KEY=${OPENAI_API_KEY:your-api-key-here} MILVUS_ADDRESS=${MILVUS_ADDRESS:localhost:19530} tsx src/index.ts",
         "prepublishOnly": "pnpm build"
@@ -24,8 +30,11 @@
     },
     "devDependencies": {
         "@types/node": "^20.0.0",
+        "@vitest/coverage-v8": "^2.1.8",
+        "memfs": "^4.14.0",
         "tsx": "^4.19.4",
-        "typescript": "^5.0.0"
+        "typescript": "^5.0.0",
+        "vitest": "^2.1.8"
     },
     "files": [
         "dist",

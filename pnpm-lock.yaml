@@ -167,12 +167,21 @@ importers:
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.0
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@20.19.0)(terser@5.43.0))
+      memfs:
+        specifier: ^4.14.0
+        version: 4.49.0
       tsx:
         specifier: ^4.19.4
         version: 4.19.4
       typescript:
         specifier: ^5.0.0
         version: 5.8.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@20.19.0)(terser@5.43.0)
 
 packages:
 

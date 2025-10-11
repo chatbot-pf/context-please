@@ -251,7 +251,12 @@ export class FakeVectorDatabase extends BaseVectorDatabase<BaseDatabaseConfig> {
             const result: Record<string, any> = {};
             for (const field of outputFields) {
                 if (field in doc) {
-                    result[field] = (doc as any)[field];
+                    // Special handling for metadata field: stringify if it's an object
+                    if (field === 'metadata' && typeof (doc as any)[field] === 'object') {
+                        result[field] = JSON.stringify((doc as any)[field]);
+                    } else {
+                        result[field] = (doc as any)[field];
+                    }
                 }
             }
             return result;
