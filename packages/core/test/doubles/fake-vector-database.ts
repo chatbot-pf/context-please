@@ -141,6 +141,14 @@ export class FakeVectorDatabase extends BaseVectorDatabase<BaseDatabaseConfig> {
         this.throwIfFailureInjected();
 
         const collection = this.collections.get(collectionName)!;
+        return this.searchInCollection(collection, queryVector, options);
+    }
+
+    private searchInCollection(
+        collection: FakeCollection,
+        queryVector: number[],
+        options?: SearchOptions
+    ): VectorSearchResult[] {
         const limit = options?.topK || 10;
         const threshold = options?.threshold || 0;
 
@@ -173,6 +181,12 @@ export class FakeVectorDatabase extends BaseVectorDatabase<BaseDatabaseConfig> {
             throw new Error(`Collection '${collectionName}' is not a hybrid collection`);
         }
 
+        // Apply filter expression if provided
+        let filteredDocuments = collection.documents;
+        if (options?.filterExpr) {
+            filteredDocuments = this.applyFilter(collection.documents, options.filterExpr);
+        }
+
         // Simulate hybrid search by combining results from multiple requests
         // This is a simplified version - real implementation would use RRF (Reciprocal Rank Fusion)
         const allResults = new Map<string, { document: VectorDocument; scores: number[] }>();
@@ -181,13 +195,15 @@ export class FakeVectorDatabase extends BaseVectorDatabase<BaseDatabaseConfig> {
             let requestResults: VectorSearchResult[];
 
             if (Array.isArray(request.data)) {
-                // Dense vector search
-                requestResults = await this.search(collectionName, request.data, {
+                // Dense vector search on filtered documents
+                const tempCollection = { ...collection, documents: filteredDocuments };
+                requestResults = await this.searchInCollection(tempCollection, request.data, {
                     topK: request.limit,
                 });
             } else {
-                // Sparse/BM25 search (simulate with simple keyword matching)
-                requestResults = this.simulateBM25Search(collection, request.data as string, request.limit);
+                // Sparse/BM25 search (simulate with simple keyword matching) on filtered documents
+                const tempCollection = { ...collection, documents: filteredDocuments };
+                requestResults = this.simulateBM25Search(tempCollection, request.data as string, request.limit);
             }
 
             // Accumulate scores for RRF
@@ -375,17 +391,27 @@ export class FakeVectorDatabase extends BaseVectorDatabase<BaseDatabaseConfig> {
 
     private applyFilter(documents: VectorDocument[], filter: string): VectorDocument[] {
         // Very simplified filter evaluation
-        // Only supports basic "field == value" or "id in [...]" expressions
+        // Supports: "id in [...]" and "fileExtension in [...]" expressions
 
         if (filter.includes(' in ')) {
             // Handle "id in ['id1', 'id2']" pattern
-            const match = filter.match(/id in \[(.*?)\]/);
-            if (match) {
-                const ids = match[1]
+            const idMatch = filter.match(/id in \[(.*?)\]/);
+            if (idMatch) {
+                const ids = idMatch[1]
                     .split(',')
                     .map(s => s.trim().replace(/['"]/g, ''));
                 const idSet = new Set(ids);
                 return documents.filter(doc => idSet.has(doc.id));
+            }
+
+            // Handle "fileExtension in ['.ts', '.js']" pattern
+            const extMatch = filter.match(/fileExtension in \[(.*?)\]/);
+            if (extMatch) {
+                const extensions = extMatch[1]
+                    .split(',')
+                    .map(s => s.trim().replace(/['"]/g, ''));
+                const extSet = new Set(extensions);
+                return documents.filter(doc => extSet.has(doc.fileExtension));
             }
         }
 
