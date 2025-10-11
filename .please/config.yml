@@ -1,0 +1,28 @@
+code_review:
+  # Enable or disable all code review functionality
+  disable: false
+
+  # Minimum severity level for review comments
+  # Options: LOW, MEDIUM, HIGH
+  comment_severity_threshold: MEDIUM
+
+  # Maximum number of review comments per PR (-1 for unlimited)
+  max_review_comments: -1
+
+  # Pull request opened event behavior
+  pull_request_opened:
+    # Show help message when PR is opened
+    help: false
+
+    # Generate PR summary
+    summary: true
+
+    # Perform automatic code review
+    code_review: true
+
+    # Include draft PRs in automatic reviews
+    include_drafts: true
+
+# Language preference for bot responses
+# Options: ko (Korean), en (English)
+language: en
