@@ -1,0 +1,27 @@
+{
+  "packages": {
+    "packages/core": {
+      "release-type": "node",
+      "package-name": "@pleaseai/context-please-core",
+      "component": "core"
+    },
+    "packages/mcp": {
+      "release-type": "node",
+      "package-name": "@pleaseai/context-please-mcp",
+      "component": "mcp"
+    },
+    "packages/vscode-extension": {
+      "release-type": "node",
+      "package-name": "semanticcodesearch",
+      "component": "vscode-extension"
+    },
+    "packages/chrome-extension": {
+      "release-type": "node",
+      "package-name": "@pleaseai/context-please-chrome-extension",
+      "component": "chrome-extension"
+    }
+  },
+  "release-type": "node",
+  "plugins": ["node-workspace"],
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json"
+}

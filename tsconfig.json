@@ -21,10 +21,10 @@
         "incremental": true,
         "tsBuildInfoFile": ".tsbuildinfo",
         "paths": {
-            "@zilliz/claude-context-core": [
+            "@pleaseai/context-please-core": [
                 "./packages/core/src"
             ],
-            "@zilliz/claude-context-core/*": [
+            "@pleaseai/context-please-core/*": [
                 "./packages/core/src/*"
             ]
         }

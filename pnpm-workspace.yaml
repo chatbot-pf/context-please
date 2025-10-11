@@ -1,6 +1,9 @@
 packages:
   - packages/*
+  - '!packages/chrome-extension'
+  - '!packages/vscode-extension'
   - examples/*
+
 
 ignoredBuiltDependencies:
   - faiss-node
