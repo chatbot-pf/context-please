@@ -265,10 +265,9 @@ describe('Lifecycle Integration', () => {
             await context.clearIndex(fixturesPath);
             expect(await fakeDb.hasCollection(collectionName)).toBe(false);
 
-            // Step 4: Verify search fails
-            await expect(
-                context.semanticSearch(fixturesPath, 'user', 5)
-            ).rejects.toThrow();
+            // Step 4: Verify search returns empty (no collection)
+            const searchAfterClear = await context.semanticSearch(fixturesPath, 'user', 5);
+            expect(searchAfterClear).toEqual([]);
         });
 
         it('should handle full lifecycle multiple times', async () => {
