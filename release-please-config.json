@@ -23,5 +23,6 @@
   },
   "release-type": "node",
   "plugins": ["node-workspace"],
+  "bootstrap-sha": "d9aacabbdc37980be75a3431cef4a3f7b415a3ab",
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json"
 }
