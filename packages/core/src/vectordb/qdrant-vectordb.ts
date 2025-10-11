@@ -292,11 +292,11 @@ export class QdrantVectorDatabase extends BaseVectorDatabase<QdrantConfig> {
 
         console.log('[QdrantDB] 📝 Inserting', documents.length, 'hybrid documents into:', collectionName);
 
-        // Train BM25 if not already trained
+        // Ensure BM25 is trained before insertion
         if (!this.bm25Generator.isTrained()) {
-            console.log('[QdrantDB] 🎓 Training BM25 generator on document corpus...');
-            const contents = documents.map(d => d.content);
-            this.bm25Generator.learn(contents);
+            // The BM25 model must be trained on the full corpus before insertion for accurate sparse vectors.
+            // Training on a single batch leads to incorrect IDF scores and poor search quality.
+            throw new Error('BM25 generator is not trained. The caller must explicitly train it via `getBM25Generator().learn(corpus)` before calling `insertHybrid`.');
         }
 
         // Generate sparse vectors for all documents
@@ -410,9 +410,16 @@ export class QdrantVectorDatabase extends BaseVectorDatabase<QdrantConfig> {
 
         console.log('[QdrantDB] 🔍 Performing hybrid search in collection:', collectionName);
 
-        // Extract dense vector and query text from search requests
-        const denseQuery = searchRequests[0].data as number[];
-        const textQuery = searchRequests[1].data as string;
+        // Extract dense vector and query text from search requests by inspecting data types
+        const denseQueryReq = searchRequests.find(req => Array.isArray(req.data));
+        const textQueryReq = searchRequests.find(req => typeof req.data === 'string');
+
+        if (!denseQueryReq || !textQueryReq) {
+            throw new Error('Hybrid search requires one dense vector request (number[] data) and one text request (string data).');
+        }
+
+        const denseQuery = denseQueryReq.data as number[];
+        const textQuery = textQueryReq.data as string;
 
         // Generate sparse vector using BM25
         if (!this.bm25Generator.isTrained()) {
@@ -445,7 +452,7 @@ export class QdrantVectorDatabase extends BaseVectorDatabase<QdrantConfig> {
                         },
                     },
                     using: this.SPARSE_VECTOR_NAME,
-                    limit: BigInt(searchRequests[1].limit || 20),
+                    limit: BigInt(textQueryReq.limit || 20),
                 },
                 {
                     query: {
@@ -459,7 +466,7 @@ export class QdrantVectorDatabase extends BaseVectorDatabase<QdrantConfig> {
                         },
                     },
                     using: this.DENSE_VECTOR_NAME,
-                    limit: BigInt(searchRequests[0].limit || 20),
+                    limit: BigInt(denseQueryReq.limit || 20),
                 },
             ],
             query: {
@@ -594,20 +601,17 @@ export class QdrantVectorDatabase extends BaseVectorDatabase<QdrantConfig> {
                     .split(',')
                     .map(v => v.trim().replace(/['"]/g, ''));
 
+                // For "IN" operator, use a "should" clause with multiple keyword matches.
                 return {
-                    must: [
-                        {
-                            key: field,
-                            match: {
-                                value: {
-                                    case: 'keywords' as const,
-                                    value: {
-                                        keywords: values.map(v => ({ stringValue: v })),
-                                    },
-                                },
+                    should: values.map(value => ({
+                        key: field,
+                        match: {
+                            value: {
+                                case: 'keyword' as const,
+                                value: { stringValue: value },
                             },
                         },
-                    ],
+                    })),
                 };
             }
         } else if (expr.includes('==')) {

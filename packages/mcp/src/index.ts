@@ -69,9 +69,13 @@ class ContextMcpServer {
             const qdrantUrl = config.qdrantUrl || 'http://localhost:6333';
             const url = new URL(qdrantUrl);
 
-            // For Qdrant gRPC, we need host:port format
-            // Default gRPC port is 6334 for Qdrant
-            const grpcPort = url.port || '6334';
+            // For Qdrant gRPC, we need host:port format.
+            // Auto-convert default REST port (6333) to default gRPC port (6334).
+            let grpcPort = url.port || '6334';
+            if (grpcPort === '6333') {
+                console.log('[VECTORDB] Qdrant REST port 6333 detected, switching to gRPC port 6334.');
+                grpcPort = '6334';
+            }
             const grpcAddress = `${url.hostname}:${grpcPort}`;
 
             console.log(`[VECTORDB] Qdrant gRPC address: ${grpcAddress}`);
