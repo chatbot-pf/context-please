@@ -550,7 +550,10 @@ export class QdrantVectorDatabase extends BaseVectorDatabase<QdrantConfig> {
         const scrollParams: any = {
             collectionName,
             limit: limit || 100,
-            withPayload: { enable: true },
+            // Use outputFields to specify which payload fields to retrieve
+            withPayload: outputFields.length > 0
+                ? { include: { fields: outputFields } }
+                : { enable: true },
             withVectors: { enable: false },
         };
 
@@ -561,15 +564,43 @@ export class QdrantVectorDatabase extends BaseVectorDatabase<QdrantConfig> {
 
         const results = await this.client!.api('points').scroll(scrollParams);
 
-        return results.result.map((point: any) => ({
-            id: point.id?.str || point.id?.num?.toString() || '',
-            content: point.payload?.content?.stringValue,
-            relativePath: point.payload?.relativePath?.stringValue,
-            startLine: Number(point.payload?.startLine?.integerValue || 0),
-            endLine: Number(point.payload?.endLine?.integerValue || 0),
-            fileExtension: point.payload?.fileExtension?.stringValue,
-            metadata: JSON.parse(point.payload?.metadata?.stringValue || '{}'),
-        }));
+        // Dynamically map results based on requested outputFields
+        return results.result.map((point: any) => {
+            const result: Record<string, any> = {
+                id: point.id?.str || point.id?.num?.toString() || '',
+            };
+
+            // If no specific fields requested, return all known fields
+            if (outputFields.length === 0) {
+                result.content = point.payload?.content?.stringValue;
+                result.relativePath = point.payload?.relativePath?.stringValue;
+                result.startLine = Number(point.payload?.startLine?.integerValue || 0);
+                result.endLine = Number(point.payload?.endLine?.integerValue || 0);
+                result.fileExtension = point.payload?.fileExtension?.stringValue;
+                result.metadata = JSON.parse(point.payload?.metadata?.stringValue || '{}');
+            } else {
+                // Only include requested fields
+                for (const field of outputFields) {
+                    if (point.payload?.[field]) {
+                        const value = point.payload[field];
+                        // Handle different value types
+                        if (value.stringValue !== undefined) {
+                            result[field] = field === 'metadata'
+                                ? JSON.parse(value.stringValue || '{}')
+                                : value.stringValue;
+                        } else if (value.integerValue !== undefined) {
+                            result[field] = Number(value.integerValue);
+                        } else if (value.doubleValue !== undefined) {
+                            result[field] = value.doubleValue;
+                        } else if (value.boolValue !== undefined) {
+                            result[field] = value.boolValue;
+                        }
+                    }
+                }
+            }
+
+            return result;
+        });
     }
 
     /**
@@ -604,13 +635,16 @@ export class QdrantVectorDatabase extends BaseVectorDatabase<QdrantConfig> {
                 // For "IN" operator, use a "must" clause with "any" match for better performance
                 return {
                     must: [{
-                        field: {
-                            key: field,
-                            match: {
-                                matchValue: {
-                                    case: 'any' as const,
-                                    value: {
-                                        values: values.map(value => ({ kind: { case: 'stringValue' as const, value } }))
+                        conditionOneOf: {
+                            case: 'field' as const,
+                            value: {
+                                key: field,
+                                match: {
+                                    matchValue: {
+                                        case: 'any' as const,
+                                        value: {
+                                            values: values.map(value => ({ kind: { case: 'stringValue' as const, value } }))
+                                        }
                                     }
                                 }
                             }
@@ -628,12 +662,15 @@ export class QdrantVectorDatabase extends BaseVectorDatabase<QdrantConfig> {
                 return {
                     must: [
                         {
-                            field: {
-                                key: field,
-                                match: {
-                                    matchValue: {
-                                        case: 'keyword' as const,
-                                        value: value
+                            conditionOneOf: {
+                                case: 'field' as const,
+                                value: {
+                                    key: field,
+                                    match: {
+                                        matchValue: {
+                                            case: 'keyword' as const,
+                                            value: value
+                                        }
                                     }
                                 }
                             }
