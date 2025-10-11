@@ -391,7 +391,16 @@ export class FakeVectorDatabase extends BaseVectorDatabase<BaseDatabaseConfig> {
 
     private applyFilter(documents: VectorDocument[], filter: string): VectorDocument[] {
         // Very simplified filter evaluation
-        // Supports: "id in [...]" and "fileExtension in [...]" expressions
+        // Supports: "id in [...]", "fileExtension in [...]", and "relativePath == "..."" expressions
+
+        // Handle "relativePath == "..."" pattern (used for deletions)
+        const relativePathMatch = filter.match(/relativePath == "([^"]+)"/);
+        if (relativePathMatch) {
+            const targetPath = relativePathMatch[1];
+            // Handle escaped backslashes (Windows paths)
+            const normalizedTarget = targetPath.replace(/\\\\/g, '\\');
+            return documents.filter(doc => doc.relativePath === normalizedTarget);
+        }
 
         if (filter.includes(' in ')) {
             // Handle "id in ['id1', 'id2']" pattern

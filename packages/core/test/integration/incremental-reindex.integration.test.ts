@@ -224,8 +224,8 @@ describe('Incremental Reindex Integration', () => {
             const originalFile1Doc = originalDocs.find(doc => doc.relativePath.includes('file1.ts'));
             const originalContent = originalFile1Doc?.content;
 
-            // Act: Modify with distinctive content
-            const newContent = 'export const x = 999; // UNIQUE_MARKER_12345';
+            // Act: Modify with distinctive content (use code, not comments, to ensure it's captured)
+            const newContent = 'export const UNIQUE_MARKER_12345 = 999;';
             await fs.writeFile(path.join(testDir, 'file1.ts'), newContent);
 
             await context.reindexByChange(testDir);
@@ -469,15 +469,18 @@ describe('Incremental Reindex Integration', () => {
             await fs.writeFile(path.join(testDir, 'file.ts'), 'code');
             await context.indexCodebase(testDir);
 
+            // Create baseline snapshot
+            await context.reindexByChange(testDir);
+
             // Corrupt the snapshot by deleting it
             await FileSynchronizer.deleteSnapshot(testDir);
 
-            // Act: Should reinitialize and detect all files as added
+            // Act: Should reinitialize and detect new file as added
             await fs.writeFile(path.join(testDir, 'new.ts'), 'new file');
             const result = await context.reindexByChange(testDir);
 
             // Assert: Should work despite corrupted snapshot
-            // Will reinitialize and detect both files
+            // Will reinitialize and detect the new file
             expect(result.added).toBeGreaterThan(0);
         });
     });
@@ -494,7 +497,8 @@ describe('Incremental Reindex Integration', () => {
             await context.reindexByChange(testDir);
 
             // Act: Modify subset and add new files
-            for (let i = 0; i < 5; i++) {
+            // Start at i=1 to avoid file0.ts having same content (0 * 100 = 0)
+            for (let i = 1; i <= 5; i++) {
                 await fs.writeFile(path.join(testDir, `file${i}.ts`), `export const x${i} = ${i * 100};`);
             }
             for (let i = 0; i < 3; i++) {

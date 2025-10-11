@@ -316,6 +316,20 @@ export class Context {
         codebasePath: string,
         progressCallback?: (progress: { phase: string; current: number; total: number; percentage: number }) => void
     ): Promise<{ added: number, removed: number, modified: number }> {
+        // Validate that the codebase path exists
+        const normalizedPath = path.resolve(codebasePath);
+        try {
+            const stat = await fs.promises.stat(normalizedPath);
+            if (!stat.isDirectory()) {
+                throw new Error(`Codebase path is not a directory: ${normalizedPath}`);
+            }
+        } catch (error: any) {
+            if (error.code === 'ENOENT') {
+                throw new Error(`Codebase path does not exist: ${normalizedPath}`);
+            }
+            throw error;
+        }
+
         const collectionName = this.getCollectionName(codebasePath);
         const synchronizer = this.synchronizers.get(collectionName);
 
