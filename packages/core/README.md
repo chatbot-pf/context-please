@@ -53,7 +53,7 @@ import {
   Context, 
   OpenAIEmbedding, 
   MilvusVectorDatabase 
-} from '@zilliz/claude-context-core';
+} from '@pleaseai/context-please-core';
 
 // Initialize embedding provider
 const embedding = new OpenAIEmbedding({
@@ -195,7 +195,7 @@ interface SemanticSearchResult {
 ### Using VoyageAI Embeddings
 
 ```typescript
-import { Context, MilvusVectorDatabase, VoyageAIEmbedding } from '@zilliz/claude-context-core';
+import { Context, MilvusVectorDatabase, VoyageAIEmbedding } from '@pleaseai/context-please-core';
 
 // Initialize with VoyageAI embedding provider
 const embedding = new VoyageAIEmbedding({

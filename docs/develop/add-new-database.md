@@ -233,7 +233,7 @@ export { YourDatabase, YourDbConfig } from './your-db-impl';
 ### 5. Usage Example
 
 ```typescript
-import { VectorDatabaseFactory, VectorDatabaseType } from '@zilliz/claude-context-core';
+import { VectorDatabaseFactory, VectorDatabaseType } from '@pleaseai/context-please-core';
 
 // Create database instance using factory
 const db = VectorDatabaseFactory.create(

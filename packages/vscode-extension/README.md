@@ -121,8 +121,8 @@ This VSCode extension is part of the Claude Context monorepo. Please see:
 
 ## Related Packages
 
-- **[@zilliz/claude-context-core](https://github.com/zilliztech/claude-context/tree/master/packages/core)** - Core indexing engine used by this extension
-- **[@zilliz/claude-context-mcp](https://github.com/zilliztech/claude-context/tree/master/packages/mcp)** - Alternative MCP server integration
+- **[@pleaseai/context-please-core](https://github.com/zilliztech/claude-context/tree/master/packages/core)** - Core indexing engine used by this extension
+- **[@pleaseai/context-please-mcp](https://github.com/zilliztech/claude-context/tree/master/packages/mcp)** - Alternative MCP server integration
 
 ## Tech Stack
 
