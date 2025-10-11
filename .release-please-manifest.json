@@ -1,0 +1,7 @@
+{
+  "packages/core": "0.1.0",
+  "packages/mcp": "0.1.0",
+  "packages/vscode-extension": "0.1.0",
+  "packages/chrome-extension": "0.1.0",
+  ".": "0.1.0"
+}

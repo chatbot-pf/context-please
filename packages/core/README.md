@@ -1,17 +1,19 @@
-# @zilliz/claude-context-core
+# @pleaseai/context-please-core
 ![](../../assets/claude-context.png)
 
-The core indexing engine for Claude Context - a powerful tool for semantic search and analysis of codebases using vector embeddings and AI.
+The core indexing engine for Context Please - a powerful tool for semantic search and analysis of codebases using vector embeddings and AI.
 
-[![npm version](https://img.shields.io/npm/v/@zilliz/claude-context-core.svg)](https://www.npmjs.com/package/@zilliz/claude-context-core)
-[![npm downloads](https://img.shields.io/npm/dm/@zilliz/claude-context-core.svg)](https://www.npmjs.com/package/@zilliz/claude-context-core)
+> **Note:** This is a fork of [@zilliz/claude-context-core](https://www.npmjs.com/package/@zilliz/claude-context-core) by Zilliz, maintained by PleaseAI.
 
-> 📖 **New to Claude Context?** Check out the [main project README](../../README.md) for an overview and quick start guide.
+[![npm version](https://img.shields.io/npm/v/@pleaseai/context-please-core.svg)](https://www.npmjs.com/package/@pleaseai/context-please-core)
+[![npm downloads](https://img.shields.io/npm/dm/@pleaseai/context-please-core.svg)](https://www.npmjs.com/package/@pleaseai/context-please-core)
+
+> 📖 **New to Context Please?** Check out the [main project README](../../README.md) for an overview and quick start guide.
 
 ## Installation
 
 ```bash
-npm install @zilliz/claude-context-core
+npm install @pleaseai/context-please-core
 ```
 
 ### Prepare Environment Variables

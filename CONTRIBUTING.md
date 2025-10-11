@@ -1,6 +1,8 @@
-# Contributing to Claude Context
+# Contributing to Context Please
 
-Thank you for your interest in contributing to Claude Context! This guide will help you get started.
+Thank you for your interest in contributing to Context Please! This guide will help you get started.
+
+> **Note:** This is a fork of [claude-context](https://github.com/zilliztech/claude-context) by Zilliz. For contributions to the original project, please visit their repository.
 
 ## 🚀 Getting Started
 
@@ -15,8 +17,8 @@ Thank you for your interest in contributing to Claude Context! This guide will h
 1. **Fork and Clone**
 
    ```bash
-   git clone https://github.com/your-username/claude-context.git
-   cd claude-context
+   git clone https://github.com/your-username/context-please.git
+   cd context-please
    ```
 
 2. **Platform-Specific Setup**

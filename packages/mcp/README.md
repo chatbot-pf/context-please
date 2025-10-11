@@ -1,12 +1,14 @@
-# @zilliz/claude-context-mcp
+# @pleaseai/context-please-mcp
 
 ![](../../assets/claude-context.png)
-Model Context Protocol (MCP) integration for Claude Context - A powerful MCP server that enables AI assistants and agents to index and search codebases using semantic search.
+Model Context Protocol (MCP) integration for Context Please - A powerful MCP server that enables AI assistants and agents to index and search codebases using semantic search.
 
-[![npm version](https://img.shields.io/npm/v/@zilliz/claude-context-mcp.svg)](https://www.npmjs.com/package/@zilliz/claude-context-mcp)
-[![npm downloads](https://img.shields.io/npm/dm/@zilliz/claude-context-mcp.svg)](https://www.npmjs.com/package/@zilliz/claude-context-mcp)
+> **Note:** This is a fork of [@zilliz/claude-context-mcp](https://www.npmjs.com/package/@zilliz/claude-context-mcp) by Zilliz, maintained by PleaseAI.
 
-> 📖 **New to Claude Context?** Check out the [main project README](../../README.md) for an overview and setup instructions.
+[![npm version](https://img.shields.io/npm/v/@pleaseai/context-please-mcp.svg)](https://www.npmjs.com/package/@pleaseai/context-please-mcp)
+[![npm downloads](https://img.shields.io/npm/dm/@pleaseai/context-please-mcp.svg)](https://www.npmjs.com/package/@pleaseai/context-please-mcp)
+
+> 📖 **New to Context Please?** Check out the [main project README](../../README.md) for an overview and setup instructions.
 
 ## 🚀 Use Claude Context as MCP in Claude Code and others
 
