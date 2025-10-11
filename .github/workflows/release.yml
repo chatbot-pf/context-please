@@ -41,9 +41,9 @@ jobs:
     - name: Publish mcp package to npm
       run: pnpm --filter @pleaseai/context-please-mcp publish --access public --no-git-checks
         
-    - name: Publish vscode extension
-      run: pnpm release:vscode
-      env:
-        VSCE_PAT: ${{ secrets.VSCE_PAT }}
+    #- name: Publish vscode extension
+    #  run: pnpm release:vscode
+    #  env:
+    #    VSCE_PAT: ${{ secrets.VSCE_PAT }}
         
     
