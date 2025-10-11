@@ -16,6 +16,7 @@ import {
     HybridSearchOptions,
     HybridSearchResult
 } from './vectordb';
+import { QdrantVectorDatabase } from './vectordb/qdrant-vectordb';
 import { SemanticSearchResult } from './types';
 import { envManager } from './utils/env-manager';
 import * as fs from 'fs';
@@ -706,7 +707,7 @@ export class Context {
         console.log(`[Context] 🔧 Using EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE}`);
 
         // For Qdrant hybrid search, we need to train BM25 on the full corpus first
-        const needsBM25Training = isHybrid && this.vectorDatabase.constructor.name === 'QdrantVectorDatabase';
+        const needsBM25Training = isHybrid && this.vectorDatabase instanceof QdrantVectorDatabase;
         const allChunks: Array<{ chunk: CodeChunk; codebasePath: string }> = [];
 
         let chunkBuffer: Array<{ chunk: CodeChunk; codebasePath: string }> = [];
@@ -731,12 +732,13 @@ export class Context {
 
                 // Add chunks to buffer
                 for (const chunk of chunks) {
-                    chunkBuffer.push({ chunk, codebasePath });
                     totalChunks++;
 
-                    // For Qdrant hybrid, collect all chunks first for BM25 training
+                    // For Qdrant hybrid, collect all chunks. For others, add to buffer.
                     if (needsBM25Training) {
                         allChunks.push({ chunk, codebasePath });
+                    } else {
+                        chunkBuffer.push({ chunk, codebasePath });
                     }
 
                     // Process batch when buffer reaches EMBEDDING_BATCH_SIZE (skip for Qdrant hybrid)
@@ -782,9 +784,8 @@ export class Context {
             const corpus = allChunks.map(item => item.chunk.content);
 
             // Get BM25 generator and train it
-            const qdrantDb = this.vectorDatabase as any;
-            if (qdrantDb.getBM25Generator) {
-                const bm25Generator = qdrantDb.getBM25Generator();
+            if (this.vectorDatabase instanceof QdrantVectorDatabase) {
+                const bm25Generator = this.vectorDatabase.getBM25Generator();
                 bm25Generator.learn(corpus);
                 console.log(`[Context] ✅ BM25 training completed on ${corpus.length} documents`);
             }
