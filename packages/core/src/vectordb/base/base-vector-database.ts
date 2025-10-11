@@ -1,4 +1,12 @@
-import { VectorDatabase } from '../types';
+import {
+    VectorDatabase,
+    VectorDocument,
+    SearchOptions,
+    VectorSearchResult,
+    HybridSearchRequest,
+    HybridSearchOptions,
+    HybridSearchResult,
+} from '../types';
 
 /**
  * Base configuration interface for all vector databases
@@ -75,25 +83,25 @@ export abstract class BaseVectorDatabase<TConfig extends BaseDatabaseConfig = Ba
 
     abstract insert(
         collectionName: string,
-        documents: any[]
+        documents: VectorDocument[]
     ): Promise<void>;
 
     abstract insertHybrid(
         collectionName: string,
-        documents: any[]
+        documents: VectorDocument[]
     ): Promise<void>;
 
     abstract search(
         collectionName: string,
         queryVector: number[],
-        options?: any
-    ): Promise<any[]>;
+        options?: SearchOptions
+    ): Promise<VectorSearchResult[]>;
 
     abstract hybridSearch(
         collectionName: string,
-        searchRequests: any[],
-        options?: any
-    ): Promise<any[]>;
+        searchRequests: HybridSearchRequest[],
+        options?: HybridSearchOptions
+    ): Promise<HybridSearchResult[]>;
 
     abstract delete(collectionName: string, ids: string[]): Promise<void>;
 

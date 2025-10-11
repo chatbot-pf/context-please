@@ -328,16 +328,19 @@ private async withRetry<T>(
     operation: () => Promise<T>,
     maxRetries: number = 3
 ): Promise<T> {
-    let lastError: Error;
+    let lastError: Error = new Error('The operation did not execute.');
     for (let i = 0; i < maxRetries; i++) {
         try {
             return await operation();
         } catch (error) {
             lastError = error as Error;
-            await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+            // Don't wait after the last attempt
+            if (i < maxRetries - 1) {
+                await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+            }
         }
     }
-    throw lastError!;
+    throw lastError;
 }
 ```
 

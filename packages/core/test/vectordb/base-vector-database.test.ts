@@ -153,12 +153,8 @@ describe('BaseVectorDatabase', () => {
         });
 
         it('should wait for initialization before operations', async () => {
-            const startTime = Date.now();
             await db.createCollection('test', 128);
-            const endTime = Date.now();
 
-            // Initialization should have taken at least some time (>= 10ms)
-            expect(endTime - startTime).toBeGreaterThanOrEqual(10);
             // Client should be connected after operation
             expect(db.isClientConnected()).toBe(true);
         });

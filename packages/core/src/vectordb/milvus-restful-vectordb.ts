@@ -60,6 +60,11 @@ export class MilvusRestfulVectorDatabase extends BaseVectorDatabase<MilvusRestfu
         super(config);
     }
 
+    /**
+     * @override
+     * Implements the abstract initialize method from BaseVectorDatabase.
+     * Initializes the Milvus RESTful client by resolving the address and setting up the connection.
+     */
     protected async initialize(): Promise<void> {
         const resolvedAddress = await this.resolveAddress();
         await this.initializeClient(resolvedAddress);

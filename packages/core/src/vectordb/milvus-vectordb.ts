@@ -23,6 +23,10 @@ export class MilvusVectorDatabase extends BaseVectorDatabase<MilvusConfig> {
         super(config);
     }
 
+    /**
+     * @override
+     * Initializes the Milvus vector database by resolving the address and creating a client connection.
+     */
     protected async initialize(): Promise<void> {
         const resolvedAddress = await this.resolveAddress();
         await this.initializeClient(resolvedAddress);
