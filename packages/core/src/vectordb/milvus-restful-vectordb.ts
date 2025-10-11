@@ -13,19 +13,15 @@ import {
     VectorDocument,
     SearchOptions,
     VectorSearchResult,
-    VectorDatabase,
     HybridSearchRequest,
     HybridSearchOptions,
     HybridSearchResult,
     COLLECTION_LIMIT_MESSAGE
 } from './types';
 import { ClusterManager } from './zilliz-utils';
+import { BaseVectorDatabase, BaseDatabaseConfig } from './base/base-vector-database';
 
-export interface MilvusRestfulConfig {
-    address?: string;
-    token?: string;
-    username?: string;
-    password?: string;
+export interface MilvusRestfulConfig extends BaseDatabaseConfig {
     database?: string;
 }
 
@@ -57,19 +53,14 @@ async function createCollectionWithLimitCheck(
  * This implementation is designed for environments where gRPC is not available,
  * such as VSCode extensions or browser environments.
  */
-export class MilvusRestfulVectorDatabase implements VectorDatabase {
-    protected config: MilvusRestfulConfig;
+export class MilvusRestfulVectorDatabase extends BaseVectorDatabase<MilvusRestfulConfig> {
     private baseUrl: string | null = null;
-    protected initializationPromise: Promise<void>;
 
     constructor(config: MilvusRestfulConfig) {
-        this.config = config;
-
-        // Start initialization asynchronously without waiting
-        this.initializationPromise = this.initialize();
+        super(config);
     }
 
-    private async initialize(): Promise<void> {
+    protected async initialize(): Promise<void> {
         const resolvedAddress = await this.resolveAddress();
         await this.initializeClient(resolvedAddress);
     }
@@ -106,10 +97,10 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
     }
 
     /**
-     * Ensure initialization is complete before method execution
+     * Override to add baseUrl null check
      */
-    protected async ensureInitialized(): Promise<void> {
-        await this.initializationPromise;
+    protected override async ensureInitialized(): Promise<void> {
+        await super.ensureInitialized();
         if (!this.baseUrl) {
             throw new Error('Base URL not initialized');
         }

@@ -3,36 +3,27 @@ import {
     VectorDocument,
     SearchOptions,
     VectorSearchResult,
-    VectorDatabase,
     HybridSearchRequest,
     HybridSearchOptions,
     HybridSearchResult,
 } from './types';
 import { ClusterManager } from './zilliz-utils';
+import { BaseVectorDatabase, BaseDatabaseConfig } from './base/base-vector-database';
 
-export interface MilvusConfig {
-    address?: string;
-    token?: string;
-    username?: string;
-    password?: string;
+export interface MilvusConfig extends BaseDatabaseConfig {
     ssl?: boolean;
 }
 
 
 
-export class MilvusVectorDatabase implements VectorDatabase {
-    protected config: MilvusConfig;
+export class MilvusVectorDatabase extends BaseVectorDatabase<MilvusConfig> {
     private client: MilvusClient | null = null;
-    protected initializationPromise: Promise<void>;
 
     constructor(config: MilvusConfig) {
-        this.config = config;
-
-        // Start initialization asynchronously without waiting
-        this.initializationPromise = this.initialize();
+        super(config);
     }
 
-    private async initialize(): Promise<void> {
+    protected async initialize(): Promise<void> {
         const resolvedAddress = await this.resolveAddress();
         await this.initializeClient(resolvedAddress);
     }
@@ -69,10 +60,10 @@ export class MilvusVectorDatabase implements VectorDatabase {
     }
 
     /**
-     * Ensure initialization is complete before method execution
+     * Override to add client null check
      */
-    protected async ensureInitialized(): Promise<void> {
-        await this.initializationPromise;
+    protected override async ensureInitialized(): Promise<void> {
+        await super.ensureInitialized();
         if (!this.client) {
             throw new Error('Client not initialized');
         }
