@@ -1,6 +1,7 @@
 import { VectorDatabase } from './types';
 import { MilvusVectorDatabase, MilvusConfig } from './milvus-vectordb';
 import { MilvusRestfulVectorDatabase, MilvusRestfulConfig } from './milvus-restful-vectordb';
+import { QdrantVectorDatabase, QdrantConfig } from './qdrant-vectordb';
 
 /**
  * Supported vector database types
@@ -17,6 +18,13 @@ export enum VectorDatabaseType {
      * Use for browser/VSCode extension environments where gRPC is not available
      */
     MILVUS_RESTFUL = 'milvus-restful',
+
+    /**
+     * Qdrant with gRPC protocol
+     * Use for Node.js environments with native hybrid search support
+     * Supports both self-hosted and Qdrant Cloud
+     */
+    QDRANT_GRPC = 'qdrant-grpc',
 }
 
 /**
@@ -25,6 +33,7 @@ export enum VectorDatabaseType {
 export type VectorDatabaseConfig = {
     [VectorDatabaseType.MILVUS_GRPC]: MilvusConfig;
     [VectorDatabaseType.MILVUS_RESTFUL]: MilvusRestfulConfig;
+    [VectorDatabaseType.QDRANT_GRPC]: QdrantConfig;
 };
 
 /**
@@ -59,6 +68,12 @@ export class VectorDatabaseFactory {
      *     VectorDatabaseType.MILVUS_RESTFUL,
      *     { address: 'https://your-cluster.com', token: 'xxx' }
      * );
+     *
+     * // Create Qdrant gRPC database
+     * const qdrantDb = VectorDatabaseFactory.create(
+     *     VectorDatabaseType.QDRANT_GRPC,
+     *     { address: 'localhost:6334', apiKey: 'xxx' }
+     * );
      * ```
      */
     static create<T extends VectorDatabaseType>(
@@ -71,6 +86,9 @@ export class VectorDatabaseFactory {
 
             case VectorDatabaseType.MILVUS_RESTFUL:
                 return new MilvusRestfulVectorDatabase(config as MilvusRestfulConfig);
+
+            case VectorDatabaseType.QDRANT_GRPC:
+                return new QdrantVectorDatabase(config as QdrantConfig);
 
             default:
                 throw new Error(`Unsupported database type: ${type}`);

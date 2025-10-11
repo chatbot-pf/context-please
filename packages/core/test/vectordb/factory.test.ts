@@ -6,6 +6,7 @@ import {
 } from '../../src/vectordb/factory';
 import { MilvusVectorDatabase } from '../../src/vectordb/milvus-vectordb';
 import { MilvusRestfulVectorDatabase } from '../../src/vectordb/milvus-restful-vectordb';
+import { QdrantVectorDatabase } from '../../src/vectordb/qdrant-vectordb';
 import { VectorDatabase } from '../../src/vectordb/types';
 
 describe('VectorDatabaseFactory', () => {
@@ -37,6 +38,21 @@ describe('VectorDatabaseFactory', () => {
             expect(db).toBeInstanceOf(MilvusRestfulVectorDatabase);
             expect(db).toHaveProperty('createCollection');
             expect(db).toHaveProperty('search');
+        });
+
+        it('should create QdrantVectorDatabase with QDRANT_GRPC type', () => {
+            const db = VectorDatabaseFactory.create(
+                VectorDatabaseType.QDRANT_GRPC,
+                {
+                    address: 'localhost:6334',
+                    apiKey: 'test-key',
+                }
+            );
+
+            expect(db).toBeInstanceOf(QdrantVectorDatabase);
+            expect(db).toHaveProperty('createCollection');
+            expect(db).toHaveProperty('search');
+            expect(db).toHaveProperty('hybridSearch');
         });
 
         it('should pass correct config to MilvusVectorDatabase', () => {
@@ -86,7 +102,8 @@ describe('VectorDatabaseFactory', () => {
 
             expect(types).toContain(VectorDatabaseType.MILVUS_GRPC);
             expect(types).toContain(VectorDatabaseType.MILVUS_RESTFUL);
-            expect(types.length).toBeGreaterThan(0);
+            expect(types).toContain(VectorDatabaseType.QDRANT_GRPC);
+            expect(types.length).toBe(3);
         });
 
         it('should return array of VectorDatabaseType', () => {
@@ -106,6 +123,10 @@ describe('VectorDatabaseFactory', () => {
 
         it('should have MILVUS_RESTFUL type', () => {
             expect(VectorDatabaseType.MILVUS_RESTFUL).toBe('milvus-restful');
+        });
+
+        it('should have QDRANT_GRPC type', () => {
+            expect(VectorDatabaseType.QDRANT_GRPC).toBe('qdrant-grpc');
         });
     });
 
@@ -136,6 +157,20 @@ describe('VectorDatabaseFactory', () => {
 
             expect(db).toBeDefined();
         });
+
+        it('should enforce correct config type for QDRANT_GRPC', () => {
+            // This test verifies TypeScript compilation
+            const db = VectorDatabaseFactory.create(
+                VectorDatabaseType.QDRANT_GRPC,
+                {
+                    address: 'localhost:6334',
+                    apiKey: 'test-key', // QdrantConfig-specific field
+                    timeout: 10000,
+                }
+            );
+
+            expect(db).toBeDefined();
+        });
     });
 
     describe('VectorDatabase interface compliance', () => {
@@ -150,7 +185,12 @@ describe('VectorDatabaseFactory', () => {
                 { address: 'https://example.com' }
             );
 
-            // Check that both instances have all VectorDatabase methods
+            const qdrantDb = VectorDatabaseFactory.create(
+                VectorDatabaseType.QDRANT_GRPC,
+                { address: 'localhost:6334' }
+            );
+
+            // Check that all instances have all VectorDatabase methods
             const requiredMethods = [
                 'createCollection',
                 'createHybridCollection',
@@ -172,6 +212,9 @@ describe('VectorDatabaseFactory', () => {
 
                 expect(restfulDb).toHaveProperty(method);
                 expect(typeof (restfulDb as any)[method]).toBe('function');
+
+                expect(qdrantDb).toHaveProperty(method);
+                expect(typeof (qdrantDb as any)[method]).toBe('function');
             });
         });
     });

@@ -16,8 +16,11 @@ export interface ContextMcpConfig {
     ollamaModel?: string;
     ollamaHost?: string;
     // Vector database configuration
+    vectorDbType?: 'milvus' | 'qdrant'; // Vector database type (default: milvus)
     milvusAddress?: string; // Optional, can be auto-resolved from token
     milvusToken?: string;
+    qdrantUrl?: string; // Qdrant URL (e.g., http://localhost:6333 or cloud URL)
+    qdrantApiKey?: string; // Qdrant API key (optional for self-hosted)
 }
 
 // Legacy format (v1) - for backward compatibility
@@ -110,7 +113,9 @@ export function createMcpConfig(): ContextMcpConfig {
     console.log(`[DEBUG]   OLLAMA_MODEL: ${envManager.get('OLLAMA_MODEL') || 'NOT SET'}`);
     console.log(`[DEBUG]   GEMINI_API_KEY: ${envManager.get('GEMINI_API_KEY') ? 'SET (length: ' + envManager.get('GEMINI_API_KEY')!.length + ')' : 'NOT SET'}`);
     console.log(`[DEBUG]   OPENAI_API_KEY: ${envManager.get('OPENAI_API_KEY') ? 'SET (length: ' + envManager.get('OPENAI_API_KEY')!.length + ')' : 'NOT SET'}`);
+    console.log(`[DEBUG]   VECTOR_DB_TYPE: ${envManager.get('VECTOR_DB_TYPE') || 'NOT SET'}`);
     console.log(`[DEBUG]   MILVUS_ADDRESS: ${envManager.get('MILVUS_ADDRESS') || 'NOT SET'}`);
+    console.log(`[DEBUG]   QDRANT_URL: ${envManager.get('QDRANT_URL') || 'NOT SET'}`);
     console.log(`[DEBUG]   NODE_ENV: ${envManager.get('NODE_ENV') || 'NOT SET'}`);
 
     const config: ContextMcpConfig = {
@@ -128,9 +133,12 @@ export function createMcpConfig(): ContextMcpConfig {
         // Ollama configuration
         ollamaModel: envManager.get('OLLAMA_MODEL'),
         ollamaHost: envManager.get('OLLAMA_HOST'),
-        // Vector database configuration - address can be auto-resolved from token
+        // Vector database configuration
+        vectorDbType: (envManager.get('VECTOR_DB_TYPE') as 'milvus' | 'qdrant') || 'milvus',
         milvusAddress: envManager.get('MILVUS_ADDRESS'), // Optional, can be resolved from token
-        milvusToken: envManager.get('MILVUS_TOKEN')
+        milvusToken: envManager.get('MILVUS_TOKEN'),
+        qdrantUrl: envManager.get('QDRANT_URL'),
+        qdrantApiKey: envManager.get('QDRANT_API_KEY')
     };
 
     return config;
@@ -143,7 +151,15 @@ export function logConfigurationSummary(config: ContextMcpConfig): void {
     console.log(`[MCP]   Server: ${config.name} v${config.version}`);
     console.log(`[MCP]   Embedding Provider: ${config.embeddingProvider}`);
     console.log(`[MCP]   Embedding Model: ${config.embeddingModel}`);
-    console.log(`[MCP]   Milvus Address: ${config.milvusAddress || (config.milvusToken ? '[Auto-resolve from token]' : '[Not configured]')}`);
+    console.log(`[MCP]   Vector Database: ${config.vectorDbType || 'milvus'}`);
+
+    // Log vector database specific configuration
+    if (config.vectorDbType === 'qdrant') {
+        console.log(`[MCP]   Qdrant URL: ${config.qdrantUrl || '[Not configured]'}`);
+        console.log(`[MCP]   Qdrant API Key: ${config.qdrantApiKey ? '✅ Configured' : '❌ Not configured'}`);
+    } else {
+        console.log(`[MCP]   Milvus Address: ${config.milvusAddress || (config.milvusToken ? '[Auto-resolve from token]' : '[Not configured]')}`);
+    }
 
     // Log provider-specific configuration without exposing sensitive data
     switch (config.embeddingProvider) {
@@ -200,8 +216,11 @@ Environment Variables:
   OLLAMA_MODEL            Ollama model name (alternative to EMBEDDING_MODEL for Ollama)
   
   Vector Database Configuration:
+  VECTOR_DB_TYPE          Vector database type: milvus (default) or qdrant
   MILVUS_ADDRESS          Milvus address (optional, can be auto-resolved from token)
   MILVUS_TOKEN            Milvus token (optional, used for authentication and address resolution)
+  QDRANT_URL              Qdrant URL (e.g., http://localhost:6333 or cloud URL)
+  QDRANT_API_KEY          Qdrant API key (optional for self-hosted)
 
 Examples:
   # Start MCP server with OpenAI (default) and explicit Milvus address
@@ -221,5 +240,11 @@ Examples:
   
   # Start MCP server with Ollama and specific model (using EMBEDDING_MODEL)
   EMBEDDING_PROVIDER=Ollama EMBEDDING_MODEL=nomic-embed-text MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
+
+  # Start MCP server with Qdrant (self-hosted)
+  OPENAI_API_KEY=sk-xxx VECTOR_DB_TYPE=qdrant QDRANT_URL=http://localhost:6333 npx @zilliz/claude-context-mcp@latest
+
+  # Start MCP server with Qdrant Cloud
+  OPENAI_API_KEY=sk-xxx VECTOR_DB_TYPE=qdrant QDRANT_URL=https://your-cluster.qdrant.io QDRANT_API_KEY=your-api-key npx @zilliz/claude-context-mcp@latest
         `);
 } 
