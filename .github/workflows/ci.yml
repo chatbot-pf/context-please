@@ -43,6 +43,11 @@ jobs:
       - name: Build packages
         run: pnpm build
 
+      - name: Run integration tests
+        run: pnpm test:integration
+        env:
+          NODE_ENV: test
+
       - name: Test clean command (Windows validation)
         if: matrix.os == 'windows-latest'
         run: |

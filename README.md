@@ -674,6 +674,36 @@ pnpm benchmark
 - Build caching is enabled for faster subsequent builds
 - Use PowerShell or Command Prompt - both work equally well
 
+### Testing
+
+Context Please includes comprehensive integration tests for both the core indexing engine and MCP server.
+
+```bash
+# Run all tests (unit + integration)
+pnpm test
+
+# Run only integration tests (123 tests)
+pnpm test:integration
+
+# Run tests for specific package
+cd packages/core && pnpm test          # All core tests
+cd packages/core && pnpm test:integration  # Core integration tests only
+cd packages/mcp && pnpm test:integration   # MCP integration tests only
+
+# Run specific test file
+pnpm test packages/core/test/integration/context.integration.test.ts
+```
+
+**Test Coverage**:
+- **Core integration tests**: 93 tests (100% passing)
+  - Context workflow (50 tests): Full indexing and search
+  - File synchronization (28 tests): Merkle DAG-based change detection
+  - Incremental reindex (27 tests): File add/modify/delete operations
+- **MCP integration tests**: 30 tests (100% passing)
+  - Tool handlers: index_codebase, search_code, clear_index, get_indexing_status
+
+For detailed testing guidelines, see [docs/develop/TESTING.md](docs/develop/TESTING.md).
+
 ### Running Examples
 
 ```bash
