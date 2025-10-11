@@ -145,6 +145,9 @@ importers:
       '@google/genai':
         specifier: ^1.9.0
         version: 1.9.0(@modelcontextprotocol/sdk@1.12.1)
+      '@qdrant/js-client-grpc':
+        specifier: ^1.15.1
+        version: 1.15.1(typescript@5.8.3)
       '@zilliz/milvus2-sdk-node':
         specifier: ^2.5.10
         version: 2.5.10
@@ -366,6 +369,22 @@ packages:
 
   '@bcoe/v8-coverage@0.2.3':
     resolution: {integrity: sha512-0hYQ8SB4Db5zvZB4axdMHGwEaQjkZzFjQiN9LVYvIFB2nSUHW9tYpxWriPrWDASIxiaXax83REcLxuSdnGPZtw==}
+
+  '@bufbuild/connect-node@0.10.1':
+    resolution: {integrity: sha512-l70tmks+txIzggO+kPkaOQmAapiBavK3rqTGsUTIlwk2nuuq8dUCIBnhbRxgZlyF67pNA1FTzoOucv/A3RteGA==}
+    engines: {node: '>=16.0.0'}
+    deprecated: Connect has moved to its own org @connectrpc and has a stable v1. Run `npx @connectrpc/connect-migrate@latest` to update. See https://github.com/connectrpc/connect-es/releases/tag/v0.13.1 for details.
+    peerDependencies:
+      '@bufbuild/protobuf': ^1.2.1
+
+  '@bufbuild/connect@0.10.1':
+    resolution: {integrity: sha512-rqdZakAdajdSnRO342K7S3gZnUPMYXF2JsUDMA4vpR34SYdWYXiL2mclUMTaUk+EfLK04ulyejNaFAc0e5o8Qw==}
+    deprecated: Connect has moved to its own org @connectrpc and has a stable v1. Run `npx @connectrpc/connect-migrate@latest` to update. See https://github.com/connectrpc/connect-es/releases/tag/v0.13.1 for details.
+    peerDependencies:
+      '@bufbuild/protobuf': ^1.2.1
+
+  '@bufbuild/protobuf@1.10.1':
+    resolution: {integrity: sha512-wJ8ReQbHxsAfXhrf9ixl0aYbZorRuOWpBNzm8pL8ftmSxQx/wnJD5Eg861NwJU/czy2VXFIebCeZnZrI9rktIQ==}
 
   '@cfworker/json-schema@4.1.1':
     resolution: {integrity: sha512-gAmrUZSGtKc3AiBL71iNWxDsyUC5uMaKKGdvzYsBoTW/xi42JQHl7eKV2OYzCUqvc+D2RCcf7EXY2iCyFIk6og==}
@@ -896,6 +915,12 @@ packages:
 
   '@protobufjs/utf8@1.1.0':
     resolution: {integrity: sha512-Vvn3zZrhQZkkBE8LSuW3em98c0FwgO4nxzv6OdSxPKJIEKY2bGbHn+mhGIPerzI4twdxaP8/0+06HBpwf345Lw==}
+
+  '@qdrant/js-client-grpc@1.15.1':
+    resolution: {integrity: sha512-r0THWNDIyWMwcly4PRouX2UwTPcPcTyyNrPG1mgIuWZ9iNaTZntsPB5rQ0GX5fyjW77Jjy8Aa8U8TQu6F7HU4A==}
+    engines: {node: '>=18.0.0', pnpm: '>=8'}
+    peerDependencies:
+      typescript: '>=4.1'
 
   '@rollup/rollup-android-arm-eabi@4.52.4':
     resolution: {integrity: sha512-BTm2qKNnWIQ5auf4deoetINJm2JzvihvGb9R6K/ETwKLql/Bb3Eg2H1FBp1gUb4YGbydMA3jcmQTR73q7J+GAA==}
@@ -2279,6 +2304,9 @@ packages:
   hasown@2.0.2:
     resolution: {integrity: sha512-0hJU9SCPvmMzIBdZFqNPXWa6dqh7WdH0cII9y+CyS8rG3nL48Bclra9HmKhVVUHyPWNH5Y7xDwAB7bfgSjkUMQ==}
     engines: {node: '>= 0.4'}
+
+  headers-polyfill@3.3.0:
+    resolution: {integrity: sha512-5e57etwBpNcDc0b6KCVWEh/Ro063OxPvzVimUdM0/tsYM/T7Hfy3kknIGj78SFTOhNd8AZY41U8mOHoO4LzmIQ==}
 
   hmac-drbg@1.0.1:
     resolution: {integrity: sha512-Tti3gMqLdZfhOQY1Mzf/AanLiqh1WTiJgEj26ZuYQ9fbkLomzGchCws4FyrSd4VkpBfiNhaE1On+lOz894jvXg==}
@@ -4169,6 +4197,18 @@ snapshots:
 
   '@bcoe/v8-coverage@0.2.3': {}
 
+  '@bufbuild/connect-node@0.10.1(@bufbuild/protobuf@1.10.1)':
+    dependencies:
+      '@bufbuild/connect': 0.10.1(@bufbuild/protobuf@1.10.1)
+      '@bufbuild/protobuf': 1.10.1
+      headers-polyfill: 3.3.0
+
+  '@bufbuild/connect@0.10.1(@bufbuild/protobuf@1.10.1)':
+    dependencies:
+      '@bufbuild/protobuf': 1.10.1
+
+  '@bufbuild/protobuf@1.10.1': {}
+
   '@cfworker/json-schema@4.1.1': {}
 
   '@colors/colors@1.6.0': {}
@@ -4574,6 +4614,13 @@ snapshots:
   '@protobufjs/pool@1.1.0': {}
 
   '@protobufjs/utf8@1.1.0': {}
+
+  '@qdrant/js-client-grpc@1.15.1(typescript@5.8.3)':
+    dependencies:
+      '@bufbuild/connect': 0.10.1(@bufbuild/protobuf@1.10.1)
+      '@bufbuild/connect-node': 0.10.1(@bufbuild/protobuf@1.10.1)
+      '@bufbuild/protobuf': 1.10.1
+      typescript: 5.8.3
 
   '@rollup/rollup-android-arm-eabi@4.52.4':
     optional: true
@@ -6244,6 +6291,8 @@ snapshots:
   hasown@2.0.2:
     dependencies:
       function-bind: 1.1.2
+
+  headers-polyfill@3.3.0: {}
 
   hmac-drbg@1.0.1:
     dependencies:

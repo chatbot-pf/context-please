@@ -22,7 +22,7 @@ import {
     CallToolRequestSchema
 } from "@modelcontextprotocol/sdk/types.js";
 import { Context } from "@zilliz/claude-context-core";
-import { MilvusVectorDatabase } from "@zilliz/claude-context-core";
+import { MilvusVectorDatabase, QdrantVectorDatabase, VectorDatabase } from "@zilliz/claude-context-core";
 
 // Import our modular components
 import { createMcpConfig, logConfigurationSummary, showHelpMessage, ContextMcpConfig } from "./config.js";
@@ -59,11 +59,38 @@ class ContextMcpServer {
         const embedding = createEmbeddingInstance(config);
         logEmbeddingProviderInfo(config, embedding);
 
-        // Initialize vector database
-        const vectorDatabase = new MilvusVectorDatabase({
-            address: config.milvusAddress,
-            ...(config.milvusToken && { token: config.milvusToken })
-        });
+        // Initialize vector database based on configuration
+        console.log(`[VECTORDB] Initializing vector database: ${config.vectorDbType || 'milvus'}`);
+
+        let vectorDatabase: VectorDatabase;
+
+        if (config.vectorDbType === 'qdrant') {
+            // Parse Qdrant URL to get address for gRPC
+            const qdrantUrl = config.qdrantUrl || 'http://localhost:6333';
+            const url = new URL(qdrantUrl.startsWith('http') ? qdrantUrl : `http://${qdrantUrl}`);
+
+            // For Qdrant gRPC, we need host:port format.
+            // Auto-convert default REST port (6333) to default gRPC port (6334).
+            let grpcPort = url.port || '6334';
+            if (grpcPort === '6333') {
+                console.log('[VECTORDB] Qdrant REST port 6333 detected, switching to gRPC port 6334.');
+                grpcPort = '6334';
+            }
+            const grpcAddress = `${url.hostname}:${grpcPort}`;
+
+            console.log(`[VECTORDB] Qdrant gRPC address: ${grpcAddress}`);
+
+            vectorDatabase = new QdrantVectorDatabase({
+                address: grpcAddress,
+                ...(config.qdrantApiKey && { apiKey: config.qdrantApiKey })
+            });
+        } else {
+            // Default to Milvus
+            vectorDatabase = new MilvusVectorDatabase({
+                address: config.milvusAddress,
+                ...(config.milvusToken && { token: config.milvusToken })
+            });
+        }
 
         // Initialize Claude Context
         this.context = new Context({

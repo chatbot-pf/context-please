@@ -17,6 +17,12 @@ export { BaseVectorDatabase, BaseDatabaseConfig } from './base/base-vector-datab
 // Implementation class exports
 export { MilvusRestfulVectorDatabase, MilvusRestfulConfig } from './milvus-restful-vectordb';
 export { MilvusVectorDatabase, MilvusConfig } from './milvus-vectordb';
+export { QdrantVectorDatabase, QdrantConfig } from './qdrant-vectordb';
+
+// Sparse vector exports
+export { SimpleBM25, BM25Config } from './sparse/simple-bm25';
+export { SparseVectorGenerator } from './sparse/sparse-vector-generator';
+export { SparseVector, SparseVectorConfig } from './sparse/types';
 
 // Factory exports
 export { VectorDatabaseFactory, VectorDatabaseType } from './factory';
