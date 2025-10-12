@@ -18,6 +18,7 @@ export { BaseVectorDatabase, BaseDatabaseConfig } from './base/base-vector-datab
 export { MilvusRestfulVectorDatabase, MilvusRestfulConfig } from './milvus-restful-vectordb';
 export { MilvusVectorDatabase, MilvusConfig } from './milvus-vectordb';
 export { QdrantVectorDatabase, QdrantConfig } from './qdrant-vectordb';
+export { FaissVectorDatabase, FaissConfig } from './faiss-vectordb';
 
 // Sparse vector exports
 export { SimpleBM25, BM25Config } from './sparse/simple-bm25';

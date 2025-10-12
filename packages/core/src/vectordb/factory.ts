@@ -2,6 +2,7 @@ import { VectorDatabase } from './types';
 import { MilvusVectorDatabase, MilvusConfig } from './milvus-vectordb';
 import { MilvusRestfulVectorDatabase, MilvusRestfulConfig } from './milvus-restful-vectordb';
 import { QdrantVectorDatabase, QdrantConfig } from './qdrant-vectordb';
+import { FaissVectorDatabase, FaissConfig } from './faiss-vectordb';
 
 /**
  * Supported vector database types
@@ -25,6 +26,13 @@ export enum VectorDatabaseType {
      * Supports both self-hosted and Qdrant Cloud
      */
     QDRANT_GRPC = 'qdrant-grpc',
+
+    /**
+     * FAISS local file-based vector database
+     * Use for local-only deployments with zero configuration
+     * Ideal for development and small-to-medium codebases
+     */
+    FAISS_LOCAL = 'faiss-local',
 }
 
 /**
@@ -34,6 +42,7 @@ export type VectorDatabaseConfig = {
     [VectorDatabaseType.MILVUS_GRPC]: MilvusConfig;
     [VectorDatabaseType.MILVUS_RESTFUL]: MilvusRestfulConfig;
     [VectorDatabaseType.QDRANT_GRPC]: QdrantConfig;
+    [VectorDatabaseType.FAISS_LOCAL]: FaissConfig;
 };
 
 /**
@@ -74,6 +83,12 @@ export class VectorDatabaseFactory {
      *     VectorDatabaseType.QDRANT_GRPC,
      *     { address: 'localhost:6334', apiKey: 'xxx' }
      * );
+     *
+     * // Create FAISS local database
+     * const faissDb = VectorDatabaseFactory.create(
+     *     VectorDatabaseType.FAISS_LOCAL,
+     *     { storageDir: '~/.context/faiss-indexes' }
+     * );
      * ```
      */
     static create<T extends VectorDatabaseType>(
@@ -89,6 +104,9 @@ export class VectorDatabaseFactory {
 
             case VectorDatabaseType.QDRANT_GRPC:
                 return new QdrantVectorDatabase(config as QdrantConfig);
+
+            case VectorDatabaseType.FAISS_LOCAL:
+                return new FaissVectorDatabase(config as FaissConfig);
 
             default:
                 throw new Error(`Unsupported database type: ${type}`);
