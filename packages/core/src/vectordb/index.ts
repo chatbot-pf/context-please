@@ -6,6 +6,7 @@ export { VectorDatabaseFactory, VectorDatabaseType } from './factory'
 
 export type { VectorDatabaseConfig } from './factory'
 // Implementation class exports
+export { FaissConfig, FaissVectorDatabase } from './faiss-vectordb'
 export { MilvusRestfulConfig, MilvusRestfulVectorDatabase } from './milvus-restful-vectordb'
 export { MilvusConfig, MilvusVectorDatabase } from './milvus-vectordb'
 
