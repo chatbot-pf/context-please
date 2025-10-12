@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/chatbot-pf/context-please/compare/core-v0.2.0...core-v0.2.1) (2025-10-12)
+
+
+### Bug Fixes
+
+* **core:** implement BM25 training for Qdrant hybrid search ([#9](https://github.com/chatbot-pf/context-please/issues/9)) ([201f4ad](https://github.com/chatbot-pf/context-please/commit/201f4ad63fe1ffc684be9917b67adad4f2ef95a7))
+
 ## [0.2.0](https://github.com/chatbot-pf/context-please/compare/core-v0.1.0...core-v0.2.0) (2025-10-11)
 
 
