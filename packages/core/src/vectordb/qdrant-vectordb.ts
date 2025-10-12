@@ -250,8 +250,8 @@ export class QdrantVectorDatabase extends BaseVectorDatabase<QdrantConfig> {
         const points = documents.map(doc => ({
             id: {
                 pointIdOptions: {
-                    case: 'uuid' as const,
-                    value: doc.id,
+                    case: 'num' as const,
+                    value: this.convertToNumericId(doc.id),
                 },
             },
             vectors: {
@@ -314,8 +314,8 @@ export class QdrantVectorDatabase extends BaseVectorDatabase<QdrantConfig> {
         const points = documents.map((doc, index) => ({
             id: {
                 pointIdOptions: {
-                    case: 'uuid' as const,
-                    value: doc.id,
+                    case: 'num' as const,
+                    value: this.convertToNumericId(doc.id),
                 },
             },
             vectors: {
@@ -528,8 +528,8 @@ export class QdrantVectorDatabase extends BaseVectorDatabase<QdrantConfig> {
                     value: {
                         ids: ids.map(id => ({
                             pointIdOptions: {
-                                case: 'uuid' as const,
-                                value: id,
+                                case: 'num' as const,
+                                value: this.convertToNumericId(id),
                             },
                         })),
                     },
@@ -690,6 +690,19 @@ export class QdrantVectorDatabase extends BaseVectorDatabase<QdrantConfig> {
         // If parsing fails, return undefined (no filtering)
         console.warn('[QdrantDB] ⚠️  Could not parse filter expression:', expr);
         return undefined;
+    }
+
+    /**
+     * Convert chunk ID to numeric ID for Qdrant
+     * Extracts the hex hash from chunk_XXXXXXXXXXXXXXXX and converts to bigint
+     *
+     * Example: chunk_edf5558e3dbbf10b -> 17141645883789484811n
+     */
+    private convertToNumericId(chunkId: string): bigint {
+        // Extract hex portion from chunk_XXXXXXXXXXXXXXXX format
+        const hex = chunkId.replace('chunk_', '');
+        // Convert hex string to bigint (16 hex chars = 64 bits)
+        return BigInt('0x' + hex);
     }
 
     /**
