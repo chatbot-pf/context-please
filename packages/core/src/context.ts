@@ -16,6 +16,7 @@ import {
     HybridSearchOptions,
     HybridSearchResult
 } from './vectordb';
+import { QdrantVectorDatabase } from './vectordb/qdrant-vectordb';
 import { SemanticSearchResult } from './types';
 import { envManager } from './utils/env-manager';
 import * as fs from 'fs';
@@ -705,6 +706,10 @@ export class Context {
         const CHUNK_LIMIT = 450000;
         console.log(`[Context] 🔧 Using EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE}`);
 
+        // For Qdrant hybrid search, we need to train BM25 on the full corpus first
+        const needsBM25Training = isHybrid && this.vectorDatabase instanceof QdrantVectorDatabase;
+        const allChunks: Array<{ chunk: CodeChunk; codebasePath: string }> = [];
+
         let chunkBuffer: Array<{ chunk: CodeChunk; codebasePath: string }> = [];
         let processedFiles = 0;
         let totalChunks = 0;
@@ -727,11 +732,17 @@ export class Context {
 
                 // Add chunks to buffer
                 for (const chunk of chunks) {
-                    chunkBuffer.push({ chunk, codebasePath });
                     totalChunks++;
 
-                    // Process batch when buffer reaches EMBEDDING_BATCH_SIZE
-                    if (chunkBuffer.length >= EMBEDDING_BATCH_SIZE) {
+                    // For Qdrant hybrid, collect all chunks. For others, add to buffer.
+                    if (needsBM25Training) {
+                        allChunks.push({ chunk, codebasePath });
+                    } else {
+                        chunkBuffer.push({ chunk, codebasePath });
+                    }
+
+                    // Process batch when buffer reaches EMBEDDING_BATCH_SIZE (skip for Qdrant hybrid)
+                    if (!needsBM25Training && chunkBuffer.length >= EMBEDDING_BATCH_SIZE) {
                         try {
                             await this.processChunkBuffer(chunkBuffer);
                         } catch (error) {
@@ -765,8 +776,36 @@ export class Context {
             }
         }
 
-        // Process any remaining chunks in the buffer
-        if (chunkBuffer.length > 0) {
+        // For Qdrant hybrid, train BM25 and process all chunks
+        if (needsBM25Training && allChunks.length > 0) {
+            console.log(`[Context] 🎓 Training BM25 on ${allChunks.length} chunks for Qdrant hybrid search...`);
+
+            // Extract corpus texts for BM25 training
+            const corpus = allChunks.map(item => item.chunk.content);
+
+            // Get BM25 generator and train it
+            if (this.vectorDatabase instanceof QdrantVectorDatabase) {
+                const bm25Generator = this.vectorDatabase.getBM25Generator();
+                bm25Generator.learn(corpus);
+                console.log(`[Context] ✅ BM25 training completed on ${corpus.length} documents`);
+            }
+
+            // Now process all chunks in batches
+            console.log(`[Context] 📝 Processing ${allChunks.length} chunks in batches of ${EMBEDDING_BATCH_SIZE}...`);
+            for (let i = 0; i < allChunks.length; i += EMBEDDING_BATCH_SIZE) {
+                const batch = allChunks.slice(i, i + EMBEDDING_BATCH_SIZE);
+                try {
+                    await this.processChunkBuffer(batch);
+                    console.log(`[Context] 📊 Processed batch ${Math.floor(i / EMBEDDING_BATCH_SIZE) + 1}/${Math.ceil(allChunks.length / EMBEDDING_BATCH_SIZE)}`);
+                } catch (error) {
+                    console.error(`[Context] ❌ Failed to process chunk batch:`, error);
+                    if (error instanceof Error) {
+                        console.error('[Context] Stack trace:', error.stack);
+                    }
+                }
+            }
+        } else if (chunkBuffer.length > 0) {
+            // Process any remaining chunks in the buffer (for non-Qdrant hybrid)
             const searchType = isHybrid === true ? 'hybrid' : 'regular';
             console.log(`📝 Processing final batch of ${chunkBuffer.length} chunks for ${searchType}`);
             try {
