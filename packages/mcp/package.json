@@ -1,6 +1,6 @@
 {
     "name": "@pleaseai/context-please-mcp",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "description": "Model Context Protocol integration for Context Please (fork of claude-context-mcp)",
     "type": "module",
     "main": "dist/index.js",
