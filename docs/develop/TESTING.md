@@ -336,17 +336,19 @@ Integration tests verify that multiple components work together correctly. Conte
 ```
 packages/
 ├── core/test/integration/          # Core integration tests
-│   ├── context.integration.test.ts              # Full indexing workflow (50 tests)
-│   ├── file-synchronizer.integration.test.ts   # Merkle DAG sync (28 tests)
-│   └── incremental-reindex.integration.test.ts # Incremental updates (27 tests)
+│   ├── indexing-workflow.integration.test.ts   # Basic indexing (15 tests)
+│   ├── search-workflow.integration.test.ts     # Semantic search (18 tests)
+│   ├── lifecycle.integration.test.ts           # Collection lifecycle (17 tests)
+│   ├── file-synchronizer.integration.test.ts   # Merkle DAG sync (24 tests)
+│   └── incremental-reindex.integration.test.ts # Incremental updates (19 tests)
 └── mcp/test/integration/           # MCP server integration tests
     └── tool-handlers.integration.test.ts        # MCP tool handlers (30 tests)
 ```
 
 ### Core Integration Tests
 
-#### Context Integration Tests (50 tests)
-Tests the complete indexing and search workflow using real components with fake vector database and embeddings.
+#### Core Integration Test Suite (93 tests)
+Tests the complete indexing and search workflow using real components with fake vector database and embeddings, split across 5 test files.
 
 **Coverage**:
 - Collection management (create, drop, check existence)
@@ -490,7 +492,7 @@ pnpm test:integration
 cd packages/core && pnpm test:integration
 
 # Run specific integration test file
-cd packages/core && pnpm test test/integration/context.integration.test.ts
+cd packages/core && pnpm test test/integration/indexing-workflow.integration.test.ts
 
 # Run with verbose output
 cd packages/core && pnpm test test/integration/incremental-reindex.integration.test.ts --reporter=verbose
@@ -579,7 +581,7 @@ cd packages/core && pnpm test
 cd packages/mcp && pnpm test
 
 # Run specific test file
-pnpm test packages/core/test/integration/context.integration.test.ts
+pnpm test packages/core/test/integration/indexing-workflow.integration.test.ts
 ```
 
 ### Test Configuration

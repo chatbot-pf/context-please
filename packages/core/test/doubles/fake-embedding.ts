@@ -60,26 +60,20 @@ export class FakeEmbedding extends Embedding {
         const processedTexts = this.preprocessTexts(texts);
         this.embeddedTexts.push(...processedTexts);
 
-        return Promise.all(
-            processedTexts.map(async text => {
-                // Check cache first
-                if (this.embeddingCache.has(text)) {
-                    return {
-                        vector: this.embeddingCache.get(text)!,
-                        dimension: this.dimension,
-                    };
-                }
-
-                // Generate deterministic vector
-                const vector = this.generateDeterministicVector(text);
+        // Generate embeddings synchronously (no need for Promise.all)
+        const results: EmbeddingVector[] = [];
+        for (const text of processedTexts) {
+            let vector = this.embeddingCache.get(text);
+            if (!vector) {
+                vector = this.generateDeterministicVector(text);
                 this.embeddingCache.set(text, vector);
-
-                return {
-                    vector,
-                    dimension: this.dimension,
-                };
-            })
-        );
+            }
+            results.push({
+                vector,
+                dimension: this.dimension,
+            });
+        }
+        return results;
     }
 
     getDimension(): number {
@@ -158,8 +152,9 @@ export class FakeEmbedding extends Embedding {
             const byte4 = hash[(hashIndex + 3) % hash.length];
 
             // Combine bytes into a value between -1 and 1
+            // Use unsigned right shift to treat as unsigned 32-bit integer
             const intValue = (byte1 << 24) | (byte2 << 16) | (byte3 << 8) | byte4;
-            const normalizedValue = (intValue / 0xffffffff) * 2 - 1;
+            const normalizedValue = ((intValue >>> 0) / 0xffffffff) * 2 - 1;
 
             vector.push(normalizedValue);
             hashIndex += 4;

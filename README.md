@@ -691,14 +691,16 @@ cd packages/core && pnpm test:integration  # Core integration tests only
 cd packages/mcp && pnpm test:integration   # MCP integration tests only
 
 # Run specific test file
-pnpm test packages/core/test/integration/context.integration.test.ts
+pnpm test packages/core/test/integration/indexing-workflow.integration.test.ts
 ```
 
 **Test Coverage**:
 - **Core integration tests**: 93 tests (100% passing)
-  - Context workflow (50 tests): Full indexing and search
-  - File synchronization (28 tests): Merkle DAG-based change detection
-  - Incremental reindex (27 tests): File add/modify/delete operations
+  - Indexing workflow (15 tests): Basic indexing operations
+  - Search workflow (18 tests): Semantic search and ranking
+  - Lifecycle (17 tests): Collection management
+  - File synchronization (24 tests): Merkle DAG-based change detection
+  - Incremental reindex (19 tests): File add/modify/delete operations
 - **MCP integration tests**: 30 tests (100% passing)
   - Tool handlers: index_codebase, search_code, clear_index, get_indexing_status
 

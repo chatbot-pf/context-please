@@ -14,7 +14,7 @@
         "test": "vitest run",
         "test:watch": "vitest",
         "test:coverage": "vitest run --coverage",
-        "test:unit": "vitest run --config vitest.config.ts",
+        "test:unit": "vitest run --exclude 'test/integration/**/*.integration.test.ts'",
         "test:integration": "vitest run --config vitest.config.integration.ts",
         "test:all": "pnpm test:unit && pnpm test:integration"
     },

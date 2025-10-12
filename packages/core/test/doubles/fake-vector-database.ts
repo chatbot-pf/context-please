@@ -372,8 +372,9 @@ export class FakeVectorDatabase extends BaseVectorDatabase<BaseDatabaseConfig> {
             let score = 0;
 
             for (const term of queryTerms) {
-                // Count term frequency
-                const termCount = (content.match(new RegExp(term, 'g')) || []).length;
+                // Count term frequency (escape regex special characters)
+                const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const termCount = (content.match(new RegExp(escapedTerm, 'g')) || []).length;
                 score += termCount;
             }
 
