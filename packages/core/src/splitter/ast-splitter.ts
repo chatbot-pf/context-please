@@ -1,5 +1,6 @@
 import Parser from 'tree-sitter';
 import { Splitter, CodeChunk } from './index';
+import { LangChainCodeSplitter } from './langchain-splitter';
 
 // Language parsers
 const JavaScript = require('tree-sitter-javascript');
@@ -37,7 +38,6 @@ export class AstCodeSplitter implements Splitter {
         this.parser = new Parser();
 
         // Initialize fallback splitter
-        const { LangChainCodeSplitter } = require('./langchain-splitter');
         this.langchainFallback = new LangChainCodeSplitter(chunkSize, chunkOverlap);
     }
 

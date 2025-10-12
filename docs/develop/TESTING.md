@@ -327,6 +327,225 @@ test('should handle basic spec', () => {
 })
 ```
 
+## Integration Testing
+
+Integration tests verify that multiple components work together correctly. Context Please includes comprehensive integration test suites for both the core indexing engine and the MCP server.
+
+### Test Organization
+
+```
+packages/
+├── core/test/integration/          # Core integration tests
+│   ├── indexing-workflow.integration.test.ts   # Basic indexing (15 tests)
+│   ├── search-workflow.integration.test.ts     # Semantic search (18 tests)
+│   ├── lifecycle.integration.test.ts           # Collection lifecycle (17 tests)
+│   ├── file-synchronizer.integration.test.ts   # Merkle DAG sync (24 tests)
+│   └── incremental-reindex.integration.test.ts # Incremental updates (19 tests)
+└── mcp/test/integration/           # MCP server integration tests
+    └── tool-handlers.integration.test.ts        # MCP tool handlers (30 tests)
+```
+
+### Core Integration Tests
+
+#### Core Integration Test Suite (93 tests)
+Tests the complete indexing and search workflow using real components with fake vector database and embeddings, split across 5 test files.
+
+**Coverage**:
+- Collection management (create, drop, check existence)
+- Hybrid collection creation with BM25 + dense vectors
+- Document indexing with AST-based code splitting
+- Semantic search with relevance scoring
+- Hybrid search combining BM25 and vector similarity
+- Extension-based filtering
+- Error handling and edge cases
+
+**Example**:
+```typescript
+describe('Context Integration', () => {
+    let context: Context;
+    let fakeDb: FakeVectorDatabase;
+    let fakeEmbedding: FakeEmbedding;
+
+    beforeEach(() => {
+        fakeDb = new FakeVectorDatabase({ address: 'test' });
+        fakeEmbedding = new FakeEmbedding(128);
+        context = new TestContextBuilder()
+            .withEmbedding(fakeEmbedding)
+            .withVectorDatabase(fakeDb)
+            .build();
+    });
+
+    it('should index codebase and enable search', async () => {
+        const result = await context.indexCodebase(fixturesPath);
+        expect(result.status).toBe('completed');
+
+        const searchResults = await context.semanticSearch(
+            fixturesPath,
+            'user authentication',
+            5
+        );
+        expect(searchResults.results.length).toBeGreaterThan(0);
+    });
+});
+```
+
+#### File Synchronizer Integration Tests (28 tests)
+Tests Merkle DAG-based change detection for incremental indexing.
+
+**Coverage**:
+- File addition detection
+- File modification detection
+- File deletion detection
+- Directory structure changes
+- Snapshot persistence and recovery
+- Cross-instance state sharing
+- Ignore pattern handling
+
+**Key Pattern**: Uses temporary directories with file I/O to test real file system changes.
+
+#### Incremental Reindex Integration Tests (27 tests)
+Tests the complete incremental reindexing workflow using `reindexByChange`.
+
+**Coverage**:
+- Adding new files and indexing their chunks
+- Modifying existing files and updating chunks
+- Deleting files and removing chunks
+- Combined operations in single reindex
+- Error handling for non-existent paths
+- Corrupted snapshot recovery
+- Large-scale change performance
+
+**Critical Pattern**: Always call `reindexByChange()` after `indexCodebase()` to establish baseline snapshot:
+
+```typescript
+beforeEach(async () => {
+    await fs.writeFile(path.join(testDir, 'existing.ts'), 'code');
+    await context.indexCodebase(testDir);
+
+    // CRITICAL: Create baseline snapshot
+    await context.reindexByChange(testDir);
+});
+
+it('should detect new files', async () => {
+    await fs.writeFile(path.join(testDir, 'new.ts'), 'new code');
+    const result = await context.reindexByChange(testDir);
+
+    expect(result.added).toBe(1);
+});
+```
+
+### MCP Integration Tests (30 tests)
+
+Tests all MCP server tool handlers with realistic scenarios.
+
+**Coverage**:
+- `index_codebase`: Background indexing with all parameters
+- `search_code`: Semantic search with various queries
+- `clear_index`: Collection cleanup and error handling
+- `get_indexing_status`: Progress tracking and status reporting
+- Path resolution (relative to absolute)
+- Extension and ignore pattern filtering
+- Cloud synchronization simulation
+
+**Test Doubles**:
+- `FakeVectorDatabase`: In-memory vector storage with cosine similarity
+- `FakeEmbedding`: Deterministic embeddings based on content hashing
+- `FakeSnapshotManager`: In-memory snapshot tracking for MCP state
+- `TestToolHandlerBuilder`: Fluent API for test setup
+
+**Example**:
+```typescript
+describe('MCP Tool Handlers Integration', () => {
+    let handlers: ToolHandlers;
+    let fakeDb: FakeVectorDatabase;
+
+    beforeEach(() => {
+        const setup = new TestToolHandlerBuilder().build();
+        handlers = setup.handlers;
+        fakeDb = setup.fakeDb;
+    });
+
+    it('should index and search codebase', async () => {
+        await handlers.handleIndexCodebase({
+            path: fixturesPath,
+            force: false
+        });
+
+        const result = await handlers.handleSearchCode({
+            path: fixturesPath,
+            query: 'user service',
+            limit: 5
+        });
+
+        expect(result.content[0].text).toContain('Found');
+    });
+});
+```
+
+### Running Integration Tests
+
+```bash
+# Run all integration tests (both core and MCP)
+pnpm test:integration
+
+# Run core integration tests only
+cd packages/core && pnpm test:integration
+
+# Run specific integration test file
+cd packages/core && pnpm test test/integration/indexing-workflow.integration.test.ts
+
+# Run with verbose output
+cd packages/core && pnpm test test/integration/incremental-reindex.integration.test.ts --reporter=verbose
+```
+
+### Integration Test Best Practices
+
+1. **Use Real File System**: Create temporary directories for file-based tests
+   ```typescript
+   testDir = path.join(os.tmpdir(), `context-test-${Date.now()}`);
+   await fs.mkdir(testDir, { recursive: true });
+   ```
+
+2. **Clean Up Resources**: Always clean up in `afterEach`
+   ```typescript
+   afterEach(async () => {
+       await fs.rm(testDir, { recursive: true, force: true });
+       await FileSynchronizer.deleteSnapshot(testDir);
+       fakeDb.reset();
+   });
+   ```
+
+3. **Test Realistic Scenarios**: Use actual code files, not minimal stubs
+   ```typescript
+   await fs.writeFile(
+       path.join(testDir, 'service.ts'),
+       'export class UserService { authenticate() {} }'
+   );
+   ```
+
+4. **Verify End-to-End**: Check final state, not intermediate steps
+   ```typescript
+   // Good: Verify final database state
+   const docs = fakeDb.getStoredDocuments(collectionName);
+   expect(docs.some(d => d.content.includes('UserService'))).toBe(true);
+
+   // Avoid: Testing internal implementation details
+   ```
+
+5. **Handle Async Operations**: Await all async operations properly
+   ```typescript
+   const result = await context.reindexByChange(testDir);
+   expect(result.added).toBe(1);
+   ```
+
+### Test Coverage Goals
+
+- **Core integration tests**: 93 tests (100% passing)
+- **MCP integration tests**: 30 tests (100% passing)
+- **Total**: 123 integration tests
+
+Integration tests complement unit tests by verifying that components work together correctly in realistic scenarios.
+
 ## Project-Specific Guidelines
 
 ### Using Our Test Doubles
@@ -346,15 +565,23 @@ plugins/sync/test/
 ```
 
 ### Running Tests
+
+**Context Please (pnpm/vitest)**:
 ```bash
-# Run all tests
-bun test
+# Run all tests (unit + integration)
+pnpm test
+
+# Run only integration tests
+pnpm test:integration
+
+# Run core package tests
+cd packages/core && pnpm test
+
+# Run MCP package tests
+cd packages/mcp && pnpm test
 
 # Run specific test file
-bun test plugins/sync/test/adapters/github.adapter.test.ts
-
-# Run with coverage
-bun test --coverage
+pnpm test packages/core/test/integration/indexing-workflow.integration.test.ts
 ```
 
 ### Test Configuration
