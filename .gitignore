@@ -70,3 +70,7 @@ evaluation/retrieval_results*
 .venv/
 
 coverage/
+
+# Docker volumes
+evaluation/volumes/
+volumes/

@@ -445,6 +445,18 @@ export class Context {
                 console.log(`[Context] ⚠️  Collection '${collectionName}' exists but may be empty or not properly indexed:`, error);
             }
 
+            // Load BM25 model if using Qdrant and model is not yet trained
+            if (this.vectorDatabase instanceof QdrantVectorDatabase) {
+                const bm25Generator = this.vectorDatabase.getBM25Generator();
+                if (!bm25Generator.isTrained()) {
+                    console.log('[Context] 📂 BM25 model not loaded, attempting to load from disk...');
+                    const loaded = await this.vectorDatabase.loadBM25Model(collectionName);
+                    if (!loaded) {
+                        console.warn('[Context] ⚠️  Failed to load BM25 model. Hybrid search quality may be degraded.');
+                    }
+                }
+            }
+
             // 1. Generate query vector
             console.log(`[Context] 🔍 Generating embeddings for query: "${query}"`);
             const queryEmbedding: EmbeddingVector = await this.embedding.embed(query);
@@ -560,6 +572,11 @@ export class Context {
 
         if (collectionExists) {
             await this.vectorDatabase.dropCollection(collectionName);
+        }
+
+        // Delete BM25 model if using Qdrant
+        if (this.vectorDatabase instanceof QdrantVectorDatabase) {
+            await this.vectorDatabase.deleteBM25Model(collectionName);
         }
 
         // Delete snapshot file
@@ -799,9 +816,13 @@ export class Context {
 
             // Get BM25 generator and train it
             if (this.vectorDatabase instanceof QdrantVectorDatabase) {
+                const collectionName = this.getCollectionName(codebasePath);
                 const bm25Generator = this.vectorDatabase.getBM25Generator();
                 bm25Generator.learn(corpus);
                 console.log(`[Context] ✅ BM25 training completed on ${corpus.length} documents`);
+
+                // Save BM25 model to disk for future use
+                await this.vectorDatabase.saveBM25Model(collectionName);
             }
 
             // Now process all chunks in batches

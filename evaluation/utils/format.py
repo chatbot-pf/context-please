@@ -46,9 +46,8 @@ def extract_file_paths_from_edits(response, codebase_path):
     # Pattern to match "Successfully modified file: /path/to/file"
     edit_pattern = r"Successfully modified file:\s*(.+?)(?:\s|$)"
 
-    # Also check for edit tool calls in the response
     # Pattern to match edit tool calls with file_path parameter
-    tool_call_pattern = r"edit.*?file_path[\"']?\s*:\s*[\"']([^\"']+)[\"']"
+    edit_tool_call_pattern = r"edit.*?[\"']file_path[\"']?\s*:\s*[\"']([^\"']+)[\"']"
 
     for line in content.split("\n"):
         # Check for "Successfully modified file:" pattern
@@ -62,7 +61,7 @@ def extract_file_paths_from_edits(response, codebase_path):
                 file_paths.append(rel_path)
 
         # Check for edit tool calls
-        match = re.search(tool_call_pattern, line.strip(), re.IGNORECASE)
+        match = re.search(edit_tool_call_pattern, line.strip(), re.IGNORECASE)
         if match:
             file_path = match.group(1).strip()
             # Convert to relative path immediately for deduplication

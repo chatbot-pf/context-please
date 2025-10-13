@@ -19,18 +19,18 @@ export class ToolHandlers {
     }
 
     /**
-     * Sync indexed codebases from Zilliz Cloud collections
-     * This method fetches all collections from the vector database,
+     * Sync indexed codebases from vector database collections
+     * This method fetches all collections from the vector database (Milvus, Zilliz, or Qdrant),
      * gets the first document from each collection to extract codebasePath from metadata,
      * and updates the snapshot with discovered codebases.
-     * 
-     * Logic: Compare mcp-codebase-snapshot.json with zilliz cloud collections
+     *
+     * Logic: Compare mcp-codebase-snapshot.json with vector database collections
      * - If local snapshot has extra directories (not in cloud), remove them
      * - If local snapshot is missing directories (exist in cloud), ignore them
      */
     private async syncIndexedCodebasesFromCloud(): Promise<void> {
         try {
-            console.log(`[SYNC-CLOUD] 🔄 Syncing indexed codebases from Zilliz Cloud...`);
+            console.log(`[SYNC-CLOUD] 🔄 Syncing indexed codebases from vector database...`);
 
             // Get all collections using the interface method
             const vectorDb = this.context.getVectorDatabase();
@@ -79,11 +79,16 @@ export class ToolHandlers {
 
                     if (results && results.length > 0) {
                         const firstResult = results[0];
-                        const metadataStr = firstResult.metadata;
+                        const metadataValue = firstResult.metadata;
 
-                        if (metadataStr) {
+                        if (metadataValue) {
                             try {
-                                const metadata = JSON.parse(metadataStr);
+                                // Handle both string and object metadata
+                                // query() method already parses JSON for Qdrant, returns object
+                                // For Milvus, it might still be a string
+                                const metadata = typeof metadataValue === 'string'
+                                    ? JSON.parse(metadataValue)
+                                    : metadataValue;
                                 const codebasePath = metadata.codebasePath;
 
                                 if (codebasePath && typeof codebasePath === 'string') {
@@ -115,9 +120,19 @@ export class ToolHandlers {
 
             let hasChanges = false;
 
+            // Get currently indexing codebases to avoid removing them during background indexing
+            const indexingCodebases = this.snapshotManager.getIndexingCodebases();
+
             // Remove local codebases that don't exist in cloud
+            // BUT skip codebases that are currently being indexed (their collections may be empty)
             for (const localCodebase of localCodebases) {
                 if (!cloudCodebases.has(localCodebase)) {
+                    // Skip if this codebase is currently being indexed
+                    if (indexingCodebases.includes(localCodebase)) {
+                        console.log(`[SYNC-CLOUD] ⏭️  Skipping removal of ${localCodebase} (currently indexing)`);
+                        continue;
+                    }
+
                     this.snapshotManager.removeIndexedCodebase(localCodebase);
                     hasChanges = true;
                     console.log(`[SYNC-CLOUD] ➖ Removed local codebase (not in cloud): ${localCodebase}`);

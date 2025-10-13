@@ -86,16 +86,35 @@ class CustomRetrieval(BaseRetrieval):
 
         # Add CC server if needed
         if "cc" in self.retrieval_types:
+            # Prepare environment variables based on vector database type
+            env_vars = {
+                "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY"),
+                "EMBEDDING_BATCH_SIZE": os.getenv("EMBEDDING_BATCH_SIZE", "100"),
+            }
+
+            # Check which vector database to use
+            vector_db_type = os.getenv("VECTOR_DB_TYPE", "milvus").lower()
+
+            if vector_db_type == "qdrant":
+                # Qdrant configuration
+                env_vars["VECTOR_DB_TYPE"] = "qdrant"
+                if os.getenv("QDRANT_URL"):
+                    env_vars["QDRANT_URL"] = os.getenv("QDRANT_URL")
+                if os.getenv("QDRANT_API_KEY"):
+                    env_vars["QDRANT_API_KEY"] = os.getenv("QDRANT_API_KEY")
+            else:
+                # Milvus configuration (default)
+                if os.getenv("MILVUS_ADDRESS"):
+                    env_vars["MILVUS_ADDRESS"] = os.getenv("MILVUS_ADDRESS")
+                if os.getenv("MILVUS_TOKEN"):
+                    env_vars["MILVUS_TOKEN"] = os.getenv("MILVUS_TOKEN")
+
             servers["claude-context"] = {
                 # "command": "node",
                 # "args": [str(project_path / "packages/mcp/dist/index.js")],  # For development environment
                 "command": "npx",
-                "args": ["-y", "@pleaseai/context-please-mcp@0.1.0"],  # For reproduction environment
-                "env": {
-                    "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY"),
-                    "MILVUS_ADDRESS": os.getenv("MILVUS_ADDRESS"),
-                    "EMBEDDING_BATCH_SIZE": os.getenv("EMBEDDING_BATCH_SIZE", "100"),
-                },
+                "args": ["-y", "@pleaseai/context-please-mcp@0.2.0"],  # For reproduction environment
+                "env": env_vars,
                 "transport": "stdio",
             }
 
