@@ -1,6 +1,6 @@
 {
     "name": "@pleaseai/context-please-core",
-    "version": "0.2.1",
+    "version": "0.3.0",
     "description": "Core indexing engine for Context Please (fork of claude-context-core)",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
