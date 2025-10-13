@@ -15,6 +15,19 @@ jobs:
         os: [ubuntu-latest, windows-latest]
         node-version: [20.x, 22.x]
 
+    # Qdrant service only available on Linux runners
+    services:
+      qdrant:
+        image: qdrant/qdrant:latest
+        ports:
+          - 6333:6333  # REST API
+          - 6334:6334  # gRPC API
+        options: >-
+          --health-cmd "curl -f http://localhost:6333/health || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -47,6 +60,9 @@ jobs:
         run: pnpm test:integration
         env:
           NODE_ENV: test
+          # Qdrant service only available on Linux runners
+          QDRANT_URL: ${{ matrix.os == 'ubuntu-latest' && 'http://localhost:6333' || '' }}
+          CI: true
 
       - name: Test clean command (Windows validation)
         if: matrix.os == 'windows-latest'
