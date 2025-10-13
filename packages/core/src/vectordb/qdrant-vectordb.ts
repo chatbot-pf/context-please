@@ -1,13 +1,4 @@
-import {
-    QdrantClient,
-    Modifier,
-    PointStruct,
-    PointId,
-    NamedVectors,
-    Vector,
-    Vectors,
-    Value
-} from '@qdrant/js-client-grpc';
+import { QdrantClient, Modifier } from '@qdrant/js-client-grpc';
 import {
     VectorDocument,
     SearchOptions,
@@ -18,6 +9,9 @@ import {
 } from './types';
 import { BaseVectorDatabase, BaseDatabaseConfig } from './base/base-vector-database';
 import { SimpleBM25, BM25Config } from './sparse/simple-bm25';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import * as os from 'os';
 
 export interface QdrantConfig extends BaseDatabaseConfig {
     /**
@@ -90,6 +84,13 @@ export class QdrantVectorDatabase extends BaseVectorDatabase<QdrantConfig> {
             apiKey: this.config.apiKey,
             timeout: this.config.timeout || 10000,
         });
+
+        // Suppress MaxListenersExceededWarning for gRPC connections
+        // Multiple operations on the same collection trigger multiple listeners
+        // This is normal for gRPC HTTP/2 multiplexing and not a memory leak
+        if (this.client && typeof (this.client as any).setMaxListeners === 'function') {
+            (this.client as any).setMaxListeners(50);
+        }
 
         console.log('[QdrantDB] ✅ Connected to Qdrant successfully');
     }
@@ -374,12 +375,11 @@ export class QdrantVectorDatabase extends BaseVectorDatabase<QdrantConfig> {
 
         const searchParams: any = {
             collectionName,
-            vector: {
-                name: this.DENSE_VECTOR_NAME,
-                data: queryVector,
-            },
+            vector: queryVector,
+            vectorName: this.DENSE_VECTOR_NAME,
             limit: BigInt(options?.topK || 10),
-            withPayload: { enable: true },
+            // For gRPC API, omitting withPayload returns all payload fields
+            // Using withPayload causes "No PayloadSelector" error
         };
 
         // Apply filter if provided
@@ -439,51 +439,117 @@ export class QdrantVectorDatabase extends BaseVectorDatabase<QdrantConfig> {
 
         console.log('[QdrantDB] 🔍 Dense query vector length:', denseQuery.length);
         console.log('[QdrantDB] 🔍 Sparse query terms:', sparseQuery.indices.length);
+        console.log('[QdrantDB] 🔍 Sparse query indices:', sparseQuery.indices.slice(0, 5));
+        console.log('[QdrantDB] 🔍 Sparse query values:', sparseQuery.values.slice(0, 5));
 
-        // Qdrant query API with prefetch for hybrid search
+        // Validate sparse query has valid data
+        if (sparseQuery.indices.length === 0 ||
+            sparseQuery.values.length === 0 ||
+            sparseQuery.indices.length !== sparseQuery.values.length) {
+            console.warn('[QdrantDB] ⚠️  Invalid or empty sparse query. Falling back to dense-only search.');
+            console.warn(`[QdrantDB] ⚠️  indices.length=${sparseQuery.indices.length}, values.length=${sparseQuery.values.length}`);
+            return await this.search(collectionName, denseQuery, {
+                topK: options?.limit || 10,
+                filterExpr: options?.filterExpr,
+            });
+        }
+
+        // Validate all values are positive (Qdrant requirement for sparse vectors)
+        const hasNegativeValues = sparseQuery.values.some(v => v <= 0);
+        if (hasNegativeValues) {
+            console.error('[QdrantDB] ❌ Sparse query contains non-positive values! This should not happen.');
+            console.error('[QdrantDB] ❌ Falling back to dense-only search.');
+            return await this.search(collectionName, denseQuery, {
+                topK: options?.limit || 10,
+                filterExpr: options?.filterExpr,
+            });
+        }
+
+        console.log('[QdrantDB] ✅ Sparse query validated, proceeding with hybrid search');
+
+        // Qdrant query API with nested prefetch for hybrid search
+        // Using RRF (Reciprocal Rank Fusion) to combine sparse and dense results
+        // Structure: prefetch contains one item with nested prefetch for dense/sparse, then fusion
+        //
+        // Note: Using plain objects that match the protobuf structure defined in:
+        // @qdrant/js-client-grpc/dist/types/proto/points_pb.d.ts
+        //
+        // QueryPoints structure:
+        //   - collectionName: string
+        //   - prefetch: PrefetchQuery[]
+        //   - limit: bigint
+        //
+        // PrefetchQuery structure:
+        //   - prefetch?: PrefetchQuery[]  (nested prefetches)
+        //   - query?: Query               (query to apply)
+        //   - using?: string              (vector name)
+        //   - limit?: bigint
+        //
+        // Query structure (oneof variant):
+        //   - variant: { case: 'nearest', value: VectorInput } | { case: 'fusion', value: Fusion } | ...
+        //
+        // VectorInput structure (oneof variant):
+        //   - variant: { case: 'dense', value: DenseVector } | { case: 'sparse', value: SparseVector } | ...
+        //
+        // DenseVector: { data: number[] }
+        // SparseVector: { indices: number[], values: number[] }
+        // Fusion enum: RRF = 0, DBSF = 1
+
         const queryParams: any = {
             collectionName,
             prefetch: [
                 {
+                    // Dense vector prefetch
                     query: {
-                        query: {
-                            case: 'sparseIndices' as const,
-                            value: {
-                                indices: {
-                                    data: sparseQuery.indices.map(i => BigInt(i)),
-                                },
-                                values: {
-                                    data: sparseQuery.values,
-                                },
-                            },
-                        },
-                    },
-                    using: this.SPARSE_VECTOR_NAME,
-                    limit: BigInt(textQueryReq.limit || 20),
-                },
-                {
-                    query: {
-                        query: {
+                        variant: {
                             case: 'nearest' as const,
                             value: {
-                                vector: {
-                                    data: denseQuery,
+                                variant: {
+                                    case: 'dense' as const,
+                                    value: {
+                                        data: denseQuery,
+                                    },
                                 },
                             },
                         },
                     },
                     using: this.DENSE_VECTOR_NAME,
-                    limit: BigInt(denseQueryReq.limit || 20),
+                    limit: BigInt(denseQueryReq.limit || 25),
+                },
+                {
+                    // Sparse vector prefetch
+                    query: {
+                        variant: {
+                            case: 'nearest' as const,
+                            value: {
+                                variant: {
+                                    case: 'sparse' as const,
+                                    value: {
+                                        indices: sparseQuery.indices.map(i => Number(i)),
+                                        values: sparseQuery.values,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                    using: this.SPARSE_VECTOR_NAME,
+                    limit: BigInt(textQueryReq.limit || 25),
                 },
             ],
+            // Fusion query to combine results from prefetches
             query: {
-                query: {
+                variant: {
                     case: 'fusion' as const,
-                    value: 1, // RRF = 1
+                    value: 0 as const, // Fusion.RRF = 0
                 },
             },
             limit: BigInt(options?.limit || 10),
-            withPayload: { enable: true },
+            withPayload: {
+                selectorOptions: {
+                    case: 'enable' as const,
+                    value: true,
+                },
+            },
         };
 
         // Apply filter if provided
@@ -498,13 +564,13 @@ export class QdrantVectorDatabase extends BaseVectorDatabase<QdrantConfig> {
         return results.result.map((result: any) => ({
             document: {
                 id: result.id?.str || result.id?.num?.toString() || '',
-                content: result.payload?.content?.stringValue || '',
+                content: result.payload?.content?.kind?.value || '',
                 vector: [],
-                relativePath: result.payload?.relativePath?.stringValue || '',
-                startLine: Number(result.payload?.startLine?.integerValue || 0),
-                endLine: Number(result.payload?.endLine?.integerValue || 0),
-                fileExtension: result.payload?.fileExtension?.stringValue || '',
-                metadata: JSON.parse(result.payload?.metadata?.stringValue || '{}'),
+                relativePath: result.payload?.relativePath?.kind?.value || '',
+                startLine: Number(result.payload?.startLine?.kind?.value || 0),
+                endLine: Number(result.payload?.endLine?.kind?.value || 0),
+                fileExtension: result.payload?.fileExtension?.kind?.value || '',
+                metadata: JSON.parse(result.payload?.metadata?.kind?.value || '{}'),
             },
             score: result.score,
         }));
@@ -554,14 +620,13 @@ export class QdrantVectorDatabase extends BaseVectorDatabase<QdrantConfig> {
 
         console.log('[QdrantDB] 📋 Querying collection:', collectionName);
 
+        // Build scroll parameters
+        // For gRPC API, omitting withPayload returns all payload fields
+        // Using withPayload: true causes "No PayloadSelector" error
         const scrollParams: any = {
             collectionName,
             limit: limit || 100,
-            // Use outputFields to specify which payload fields to retrieve
-            withPayload: outputFields.length > 0
-                ? { include: { fields: outputFields } }
-                : { enable: true },
-            withVectors: { enable: false },
+            withVector: false,
         };
 
         // Parse filter expression if provided
@@ -573,25 +638,54 @@ export class QdrantVectorDatabase extends BaseVectorDatabase<QdrantConfig> {
 
         // Dynamically map results based on requested outputFields
         return results.result.map((point: any) => {
+            // Extract ID from protobuf structure
+            // In gRPC API, id can be: {pointIdOptions: {case: 'num', value: bigint}} or {case: 'str', value: string}
+            let idValue = '';
+            if (point.id?.pointIdOptions?.case === 'num') {
+                idValue = point.id.pointIdOptions.value.toString();
+            } else if (point.id?.pointIdOptions?.case === 'str') {
+                idValue = point.id.pointIdOptions.value;
+            } else if (point.id?.num !== undefined) {
+                // Fallback for backward compatibility
+                idValue = point.id.num.toString();
+            } else if (point.id?.str !== undefined) {
+                idValue = point.id.str;
+            }
+
             const result: Record<string, any> = {
-                id: point.id?.str || point.id?.num?.toString() || '',
+                id: idValue,
             };
 
             // If no specific fields requested, return all known fields
             if (outputFields.length === 0) {
-                result.content = point.payload?.content?.stringValue;
-                result.relativePath = point.payload?.relativePath?.stringValue;
-                result.startLine = Number(point.payload?.startLine?.integerValue || 0);
-                result.endLine = Number(point.payload?.endLine?.integerValue || 0);
-                result.fileExtension = point.payload?.fileExtension?.stringValue;
-                result.metadata = JSON.parse(point.payload?.metadata?.stringValue || '{}');
+                // In gRPC client, payload values are wrapped in {kind: {case: 'stringValue', value: '...'}}
+                result.content = point.payload?.content?.kind?.value || point.payload?.content?.stringValue;
+                result.relativePath = point.payload?.relativePath?.kind?.value || point.payload?.relativePath?.stringValue;
+                result.startLine = Number(point.payload?.startLine?.kind?.value || point.payload?.startLine?.integerValue || 0);
+                result.endLine = Number(point.payload?.endLine?.kind?.value || point.payload?.endLine?.integerValue || 0);
+                result.fileExtension = point.payload?.fileExtension?.kind?.value || point.payload?.fileExtension?.stringValue;
+                const metadataStr = point.payload?.metadata?.kind?.value || point.payload?.metadata?.stringValue;
+                result.metadata = JSON.parse(metadataStr || '{}');
             } else {
                 // Only include requested fields
                 for (const field of outputFields) {
                     if (point.payload?.[field]) {
                         const value = point.payload[field];
-                        // Handle different value types
-                        if (value.stringValue !== undefined) {
+                        // Handle different value types based on protobuf structure
+                        // In gRPC client, value is wrapped in {kind: {case: 'stringValue', value: '...'}}
+                        if (value.kind?.case === 'stringValue') {
+                            result[field] = field === 'metadata'
+                                ? JSON.parse(value.kind.value || '{}')
+                                : value.kind.value;
+                        } else if (value.kind?.case === 'integerValue') {
+                            result[field] = Number(value.kind.value);
+                        } else if (value.kind?.case === 'doubleValue') {
+                            result[field] = value.kind.value;
+                        } else if (value.kind?.case === 'boolValue') {
+                            result[field] = value.kind.value;
+                        }
+                        // Fallback for direct value access (backward compatibility)
+                        else if (value.stringValue !== undefined) {
                             result[field] = field === 'metadata'
                                 ? JSON.parse(value.stringValue || '{}')
                                 : value.stringValue;
@@ -710,5 +804,90 @@ export class QdrantVectorDatabase extends BaseVectorDatabase<QdrantConfig> {
      */
     public getBM25Generator(): SimpleBM25 {
         return this.bm25Generator;
+    }
+
+    /**
+     * Get BM25 model file path for a collection
+     */
+    private getBM25ModelPath(collectionName: string): string {
+        const homeDir = os.homedir();
+        const modelDir = path.join(homeDir, '.context', 'bm25');
+        return path.join(modelDir, `${collectionName}.json`);
+    }
+
+    /**
+     * Save BM25 model to disk
+     */
+    async saveBM25Model(collectionName: string): Promise<void> {
+        if (!this.bm25Generator.isTrained()) {
+            console.log('[QdrantDB] ⚠️  BM25 model is not trained, skipping save');
+            return;
+        }
+
+        try {
+            const modelPath = this.getBM25ModelPath(collectionName);
+            const modelDir = path.dirname(modelPath);
+
+            // Ensure directory exists
+            await fs.mkdir(modelDir, { recursive: true });
+
+            // Serialize and save BM25 model
+            const modelJson = this.bm25Generator.toJSON();
+            await fs.writeFile(modelPath, modelJson, 'utf-8');
+
+            console.log(`[QdrantDB] 💾 Saved BM25 model to: ${modelPath}`);
+        } catch (error) {
+            console.error(`[QdrantDB] ❌ Failed to save BM25 model:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Load BM25 model from disk
+     */
+    async loadBM25Model(collectionName: string): Promise<boolean> {
+        try {
+            const modelPath = this.getBM25ModelPath(collectionName);
+
+            // Check if model file exists
+            try {
+                await fs.access(modelPath);
+            } catch {
+                console.log(`[QdrantDB] ℹ️  No saved BM25 model found at: ${modelPath}`);
+                return false;
+            }
+
+            // Load and deserialize BM25 model
+            const modelJson = await fs.readFile(modelPath, 'utf-8');
+            this.bm25Generator = SimpleBM25.fromJSON(modelJson);
+
+            console.log(`[QdrantDB] 📂 Loaded BM25 model from: ${modelPath}`);
+            return true;
+        } catch (error) {
+            console.error(`[QdrantDB] ❌ Failed to load BM25 model:`, error);
+            return false;
+        }
+    }
+
+    /**
+     * Delete saved BM25 model
+     */
+    async deleteBM25Model(collectionName: string): Promise<void> {
+        try {
+            const modelPath = this.getBM25ModelPath(collectionName);
+
+            // Check if model file exists
+            try {
+                await fs.access(modelPath);
+            } catch {
+                // File doesn't exist, nothing to delete
+                return;
+            }
+
+            await fs.unlink(modelPath);
+            console.log(`[QdrantDB] 🗑️  Deleted BM25 model at: ${modelPath}`);
+        } catch (error) {
+            console.warn(`[QdrantDB] ⚠️  Failed to delete BM25 model:`, error);
+        }
     }
 }

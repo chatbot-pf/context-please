@@ -160,8 +160,12 @@ export class SimpleBM25 implements SparseVectorGenerator {
         const termFreq = this.calculateTermFrequency(tokens);
         const docLength = tokens.length;
 
+        console.log(`[SimpleBM25] Generate: tokenized "${text.substring(0, 50)}..." into ${tokens.length} tokens`);
+        console.log(`[SimpleBM25] Generate: unique terms: ${termFreq.size}, vocabulary size: ${this.vocabulary.size}`);
+
         const indices: number[] = [];
         const values: number[] = [];
+        let skippedTerms = 0;
 
         // Calculate BM25 score for each term
         termFreq.forEach((tf, term) => {
@@ -170,6 +174,7 @@ export class SimpleBM25 implements SparseVectorGenerator {
 
             // Skip terms not in vocabulary (unknown terms)
             if (vocabIndex === undefined || idfScore === undefined) {
+                skippedTerms++;
                 return;
             }
 
@@ -189,6 +194,13 @@ export class SimpleBM25 implements SparseVectorGenerator {
             values.push(score);
         });
 
+        console.log(`[SimpleBM25] Generate: matched ${indices.length} terms, skipped ${skippedTerms} unknown terms`);
+        if (indices.length === 0 && termFreq.size > 0) {
+            console.warn(`[SimpleBM25] ⚠️  WARNING: No terms matched in vocabulary! All ${termFreq.size} unique terms were unknown.`);
+            console.warn(`[SimpleBM25] ⚠️  Sample query terms: ${Array.from(termFreq.keys()).slice(0, 5).join(', ')}`);
+            console.warn(`[SimpleBM25] ⚠️  Sample vocab terms: ${Array.from(this.vocabulary.keys()).slice(0, 5).join(', ')}`);
+        }
+
         // Sort by score descending and apply maxTerms limit
         if (config?.maxTerms !== undefined && indices.length > config.maxTerms) {
             const combined = indices.map((idx, i) => ({ idx, val: values[i] }));
@@ -198,6 +210,34 @@ export class SimpleBM25 implements SparseVectorGenerator {
             indices.length = 0;
             values.length = 0;
             combined.forEach(({ idx, val }) => {
+                indices.push(idx);
+                values.push(val);
+            });
+        }
+
+        // Ensure all values are positive (Qdrant requirement for sparse vectors)
+        // If there are negative values, shift all values by the minimum
+        if (values.length > 0) {
+            const minValue = Math.min(...values);
+            if (minValue < 0) {
+                console.log(`[SimpleBM25] Shifting values by ${-minValue} to ensure positivity`);
+                for (let i = 0; i < values.length; i++) {
+                    values[i] -= minValue; // Subtract negative min makes all positive
+                }
+            }
+
+            // Filter out zero values (sparse vectors should not contain zeros)
+            const filtered: { idx: number; val: number }[] = [];
+            for (let i = 0; i < indices.length; i++) {
+                if (values[i] > 0) {
+                    filtered.push({ idx: indices[i], val: values[i] });
+                }
+            }
+
+            // Replace arrays with filtered values
+            indices.length = 0;
+            values.length = 0;
+            filtered.forEach(({ idx, val }) => {
                 indices.push(idx);
                 values.push(val);
             });
@@ -254,5 +294,50 @@ export class SimpleBM25 implements SparseVectorGenerator {
      */
     getIDFScores(): Map<string, number> {
         return new Map(this.idf);
+    }
+
+    /**
+     * Serialize the BM25 model to JSON
+     * Exports the trained state including vocabulary, IDF scores, and avgDocLength
+     */
+    toJSON(): string {
+        if (!this.trained) {
+            throw new Error('Cannot serialize untrained BM25 model');
+        }
+
+        return JSON.stringify({
+            k1: this.k1,
+            b: this.b,
+            minTermLength: this.minTermLength,
+            stopWords: Array.from(this.stopWords),
+            vocabulary: Array.from(this.vocabulary.entries()),
+            idf: Array.from(this.idf.entries()),
+            avgDocLength: this.avgDocLength,
+            trained: this.trained
+        });
+    }
+
+    /**
+     * Deserialize and load a BM25 model from JSON
+     * Restores the trained state including vocabulary, IDF scores, and avgDocLength
+     */
+    static fromJSON(json: string): SimpleBM25 {
+        const data = JSON.parse(json);
+
+        const bm25 = new SimpleBM25({
+            k1: data.k1,
+            b: data.b,
+            minTermLength: data.minTermLength,
+            stopWords: new Set(data.stopWords || [])
+        });
+
+        bm25.vocabulary = new Map(data.vocabulary);
+        bm25.idf = new Map(data.idf);
+        bm25.avgDocLength = data.avgDocLength;
+        bm25.trained = data.trained;
+
+        console.log(`[SimpleBM25] Loaded model with ${bm25.vocabulary.size} terms, avgDocLength: ${bm25.avgDocLength.toFixed(2)}`);
+
+        return bm25;
     }
 }
