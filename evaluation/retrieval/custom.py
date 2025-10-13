@@ -110,10 +110,10 @@ class CustomRetrieval(BaseRetrieval):
                     env_vars["MILVUS_TOKEN"] = os.getenv("MILVUS_TOKEN")
 
             servers["claude-context"] = {
-                # "command": "node",
-                # "args": [str(project_path / "packages/mcp/dist/index.js")],  # For development environment
-                "command": "npx",
-                "args": ["-y", "@pleaseai/context-please-mcp@0.2.0"],  # For reproduction environment
+                "command": "node",
+                "args": [str(project_path / "packages/mcp/dist/index.js")],  # For development environment
+                # "command": "npx",
+                # "args": ["-y", "@pleaseai/context-please-mcp@0.2.1"],  # For reproduction environment
                 "env": env_vars,
                 "transport": "stdio",
             }
@@ -270,6 +270,11 @@ class CustomRetrieval(BaseRetrieval):
         if "cc" not in self.retrieval_types:
             return
 
+        # Skip indexing if SKIP_INDEXING environment variable is set
+        if os.getenv("SKIP_INDEXING", "").lower() in ["true", "1", "yes"]:
+            logger.info(f"⏭️  Skipping indexing for {repo_path} (SKIP_INDEXING={os.getenv('SKIP_INDEXING')})")
+            return
+
         async with self.mcp_sessions_context() as tools:
             index_tool = tools["index_tool"]
             indexing_status_tool = tools["indexing_status_tool"]
@@ -345,7 +350,10 @@ class CustomRetrieval(BaseRetrieval):
         asyncio.run(self.async_run(root_dir, token))
 
     async def async_run(self, root_dir: str, token: str = "git") -> None:
-        for instance in tqdm(self.instances, desc="Running retrieval"):
+        # Process only the first 2 instances for testing
+        test_instances = self.instances
+
+        for instance in tqdm(test_instances, desc="Running retrieval"):
             instance_id = instance["instance_id"]
             repo = instance["repo"]
             commit = instance["base_commit"]
