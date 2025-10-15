@@ -68,7 +68,7 @@ jobs:
         run: pnpm test:integration
         env:
           NODE_ENV: test
-          QDRANT_URL: http://localhost:6333
+          QDRANT_URL: http://localhost:6334
           CI: true
 
       - name: Verify build outputs
@@ -153,7 +153,7 @@ jobs:
         run: pnpm test:integration
         env:
           NODE_ENV: test
-          QDRANT_URL: http://localhost:6333
+          QDRANT_URL: http://localhost:6334
           CI: true
 
       - name: Stop Qdrant container

@@ -56,6 +56,14 @@ describe('qdrant gRPC Client Integration', () => {
     catch (e) {
       // Ignore cleanup errors
     }
+
+    // Disconnect the client to avoid "session has been destroyed" errors
+    try {
+      await qdrantDb.disconnect()
+    }
+    catch (e) {
+      // Ignore disconnect errors
+    }
   })
 
   describe('collection Operations', () => {
