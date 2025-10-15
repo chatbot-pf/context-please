@@ -1,4 +1,5 @@
 import type { EmbeddingVector } from './base-embedding'
+import type { EmbedRequest } from 'ollama'
 import { Ollama } from 'ollama'
 import { Embedding } from './base-embedding'
 
@@ -69,7 +70,7 @@ export class OllamaEmbedding extends Embedding {
       console.log(`[OllamaEmbedding] 📏 Detected Ollama embedding dimension: ${this.dimension} for model: ${this.config.model}`)
     }
 
-    const embedOptions: any = {
+    const embedOptions: EmbedRequest = {
       model: this.config.model,
       input: processedText,
       options: this.config.options,
@@ -104,7 +105,7 @@ export class OllamaEmbedding extends Embedding {
     }
 
     // Use Ollama's native batch embedding API
-    const embedOptions: any = {
+    const embedOptions: EmbedRequest = {
       model: this.config.model,
       input: processedTexts, // Pass array directly to Ollama
       options: this.config.options,
@@ -205,7 +206,7 @@ export class OllamaEmbedding extends Embedding {
 
     try {
       const processedText = this.preprocessText(testText)
-      const embedOptions: any = {
+      const embedOptions: EmbedRequest = {
         model: this.config.model,
         input: processedText,
         options: this.config.options,

@@ -1,7 +1,7 @@
 import Parser from 'tree-sitter'
-
 // Language parsers
 const JavaScript = require('tree-sitter-javascript')
+
 import { CodeChunk, Splitter } from './index'
 import { LangChainCodeSplitter } from './langchain-splitter'
 const TypeScript = require('tree-sitter-typescript').typescript
