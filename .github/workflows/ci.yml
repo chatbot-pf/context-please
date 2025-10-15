@@ -102,44 +102,6 @@ jobs:
       - name: Configure Windows line endings
         run: git config --global core.autocrlf false
 
-      - name: Start Qdrant Docker container
-        run: |
-          docker run -d --rm `
-            -p 6333:6333 `
-            -p 6334:6334 `
-            -e QDRANT__SERVICE__GRPC_PORT="6334" `
-            --name qdrant_test `
-            qdrant/qdrant:latest
-          Write-Host "Qdrant container started"
-
-      - name: Wait for Qdrant to be ready
-        run: |
-          Write-Host "Waiting for Qdrant service to be ready..."
-          $maxAttempts = 30
-          $attempt = 0
-          $ready = $false
-
-          while (-not $ready -and $attempt -lt $maxAttempts) {
-            try {
-              $response = Invoke-WebRequest -Uri "http://localhost:6333/collections" -Method Get -UseBasicParsing -TimeoutSec 2
-              if ($response.StatusCode -eq 200) {
-                $ready = $true
-              }
-            } catch {
-              Write-Host "." -NoNewline
-              Start-Sleep -Seconds 2
-              $attempt++
-            }
-          }
-
-          Write-Host ""
-          if (-not $ready) {
-            Write-Host "Qdrant failed to start within timeout"
-            docker logs qdrant_test
-            exit 1
-          }
-          Write-Host "✅ Qdrant is ready!"
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -149,16 +111,11 @@ jobs:
       - name: Build packages
         run: pnpm build
 
-      - name: Run integration tests (with Qdrant)
+      - name: Run integration tests (without Qdrant)
         run: pnpm test:integration
         env:
           NODE_ENV: test
-          QDRANT_URL: http://localhost:6334
           CI: true
-
-      - name: Stop Qdrant container
-        if: always()
-        run: docker stop qdrant_test
 
       - name: Test clean command
         run: |
