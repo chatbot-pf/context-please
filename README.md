@@ -1,4 +1,4 @@
-![](assets/claude-context.png)
+
 
 ### Your entire codebase as Claude's context
 
@@ -7,6 +7,7 @@
 [![Documentation](https://img.shields.io/badge/Documentation-📚-orange.svg)](docs/)
 [![npm - core](https://img.shields.io/npm/v/@pleaseai/context-please-core?label=%40pleaseai%2Fcontext-please-core&logo=npm)](https://www.npmjs.com/package/@pleaseai/context-please-core)
 [![npm - mcp](https://img.shields.io/npm/v/@pleaseai/context-please-mcp?label=%40pleaseai%2Fcontext-please-mcp&logo=npm)](https://www.npmjs.com/package/@pleaseai/context-please-mcp)
+[![code style](https://antfu.me/badge-code-style.svg)](https://github.com/antfu/eslint-config)
 </div>
 
 > **Note:** This is a fork of [claude-context](https://github.com/zilliztech/claude-context) by Zilliz, maintained by PleaseAI with additional features and improvements.

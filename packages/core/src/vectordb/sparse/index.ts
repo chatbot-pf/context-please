@@ -1,8 +1,8 @@
-// Types
-export * from './types';
+// Implementations
+export * from './simple-bm25'
 
 // Interface
-export * from './sparse-vector-generator';
+export * from './sparse-vector-generator'
 
-// Implementations
-export * from './simple-bm25';
+// Types
+export * from './types'
