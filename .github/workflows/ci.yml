@@ -7,12 +7,81 @@ on:
     branches: [master, main, claude_context]
 
 jobs:
-  lint_and_build:
-    runs-on: ${{ matrix.os }}
+  test-linux:
+    name: Test on Linux (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        node-version: [20.x, 22.x]
+
+    # Qdrant service for integration tests
+    services:
+      qdrant:
+        image: qdrant/qdrant:latest
+        ports:
+          - 6333:6333  # REST API
+          - 6334:6334  # gRPC API
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "pnpm"
+
+      - name: Wait for Qdrant to be ready
+        run: |
+          echo "Waiting for Qdrant service to be ready..."
+          max_attempts=30
+          attempt=0
+          until curl --output /dev/null --silent --fail http://localhost:6333/collections || [ $attempt -eq $max_attempts ]; do
+            printf '.'
+            sleep 2
+            attempt=$((attempt + 1))
+          done
+          echo ""
+          if [ $attempt -eq $max_attempts ]; then
+            echo "Qdrant failed to start within timeout"
+            exit 1
+          fi
+          echo "✅ Qdrant is ready!"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # - name: Lint code
+      #   run: pnpm lint
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Run integration tests (with Qdrant)
+        run: pnpm test:integration
+        env:
+          NODE_ENV: test
+          QDRANT_URL: http://localhost:6334
+          CI: true
+
+      - name: Verify build outputs
+        run: |
+          ls -la packages/core/dist || echo "packages/core/dist not found"
+          ls -la packages/mcp/dist || echo "packages/mcp/dist not found"
+
+  test-windows:
+    name: Test on Windows (Node ${{ matrix.node-version }})
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
         node-version: [20.x, 22.x]
 
     steps:
@@ -31,7 +100,6 @@ jobs:
           cache: "pnpm"
 
       - name: Configure Windows line endings
-        if: matrix.os == 'windows-latest'
         run: git config --global core.autocrlf false
 
       - name: Install dependencies
@@ -43,25 +111,18 @@ jobs:
       - name: Build packages
         run: pnpm build
 
-      - name: Run integration tests
+      - name: Run integration tests (without Qdrant)
         run: pnpm test:integration
         env:
           NODE_ENV: test
+          CI: true
 
-      - name: Test clean command (Windows validation)
-        if: matrix.os == 'windows-latest'
+      - name: Test clean command
         run: |
           pnpm clean
           echo "Clean command executed successfully on Windows"
 
-      - name: Verify build outputs (Unix)
-        if: matrix.os != 'windows-latest'
-        run: |
-          ls -la packages/core/dist || echo "packages/core/dist not found"
-          ls -la packages/mcp/dist || echo "packages/mcp/dist not found"
-
-      - name: Verify build outputs (Windows)
-        if: matrix.os == 'windows-latest'
+      - name: Verify build outputs
         run: |
           Get-ChildItem packages/core/dist -ErrorAction SilentlyContinue | Format-Table -AutoSize || Write-Host "packages/core/dist not found"
           Get-ChildItem packages/mcp/dist -ErrorAction SilentlyContinue | Format-Table -AutoSize || Write-Host "packages/mcp/dist not found"
