@@ -1,5 +1,5 @@
-import type { EmbeddingVector } from './base-embedding'
 import type { ContentEmbedding } from '@google/genai'
+import type { EmbeddingVector } from './base-embedding'
 import { GoogleGenAI } from '@google/genai'
 import { Embedding } from './base-embedding'
 

@@ -1,5 +1,5 @@
-import type { EmbeddingVector } from './base-embedding'
 import type { EmbedRequest } from 'ollama'
+import type { EmbeddingVector } from './base-embedding'
 import { Ollama } from 'ollama'
 import { Embedding } from './base-embedding'
 
