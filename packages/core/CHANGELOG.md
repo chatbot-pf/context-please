@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/chatbot-pf/context-please/compare/core-v0.2.1...core-v0.3.0) (2025-10-18)
+
+
+### Features
+
+* add support for Qdrant and enhance evaluation scripts ([#10](https://github.com/chatbot-pf/context-please/issues/10)) ([7ad86cf](https://github.com/chatbot-pf/context-please/commit/7ad86cfd72379e5aec4085d2037fc8c82bb8ffb3))
+
 ## [0.2.1](https://github.com/chatbot-pf/context-please/compare/core-v0.2.0...core-v0.2.1) (2025-10-12)
 
 
