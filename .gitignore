@@ -74,3 +74,5 @@ coverage/
 # Docker volumes
 evaluation/volumes/
 volumes/
+
+.mcp.json
