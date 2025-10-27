@@ -531,7 +531,7 @@ For detailed evaluation methodology and results, see the [evaluation directory](
 - 🧠 **Context-Aware**: Discover large codebase, understand how different parts of your codebase relate, even across millions of lines of code.
 - ⚡ **Incremental Indexing**: Efficiently re-index only changed files using Merkle trees.
 - 🧩 **Intelligent Code Chunking**: Analyze code in Abstract Syntax Trees (AST) for chunking.
-- 🗄️ **Scalable**: Integrates with Zilliz Cloud for scalable vector search, no matter how large your codebase is.
+- 🗄️ **Scalable**: Integrates with vector databases (Milvus, Zilliz Cloud, Qdrant) for scalable vector search, no matter how large your codebase is.
 - 🛠️ **Customizable**: Configure file extensions, ignore patterns, and embedding models.
 
 ### Core Components
@@ -546,7 +546,7 @@ Context Please is a monorepo containing main packages:
 ### Supported Technologies
 
 - **Embedding Providers**: [OpenAI](https://openai.com), [VoyageAI](https://voyageai.com), [Ollama](https://ollama.ai), [Gemini](https://gemini.google.com)
-- **Vector Databases**: [Milvus](https://milvus.io) or [Zilliz Cloud](https://zilliz.com/cloud)(fully managed vector database as a service)
+- **Vector Databases**: [Milvus](https://milvus.io), [Zilliz Cloud](https://zilliz.com/cloud)(fully managed vector database as a service), [Qdrant](https://qdrant.tech)
 - **Code Splitters**: AST-based splitter (with automatic fallback), LangChain character-based splitter
 - **Languages**: TypeScript, JavaScript, Python, Java, C++, C#, Go, Rust, PHP, Ruby, Swift, Kotlin, Scala, Markdown
 - **Development Tools**: VSCode, Model Context Protocol
@@ -779,3 +779,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [npm - MCP Server](https://www.npmjs.com/package/@pleaseai/context-please-mcp)
 - [Milvus Documentation](https://milvus.io/docs)
 - [Zilliz Cloud](https://zilliz.com/cloud)
+- [Qdrant Documentation](https://qdrant.tech/documentation/)
