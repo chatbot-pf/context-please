@@ -593,6 +593,44 @@ export class Context {
   }
 
   /**
+   * Get collection statistics from vector database
+   * @param codebasePath Codebase path to get stats for
+   * @returns Object with totalChunks and unique file count, or null if collection doesn't exist
+   */
+  async getCollectionStats(codebasePath: string): Promise<{ indexedFiles: number, totalChunks: number } | null> {
+    const collectionName = this.getCollectionName(codebasePath)
+
+    // Check if collection exists
+    const hasCollection = await this.vectorDatabase.hasCollection(collectionName)
+    if (!hasCollection) {
+      return null
+    }
+
+    try {
+      // Query all documents to get total count and unique file count
+      // We only need relativePath field to count unique files
+      const allDocs = await this.vectorDatabase.query(
+        collectionName,
+        '', // Empty filter = all documents
+        ['relativePath'], // Only need file path for counting
+        100000, // High limit to get all chunks (up to 100k)
+      )
+
+      const totalChunks = allDocs.length
+      const uniqueFiles = new Set(allDocs.map((doc) => doc.relativePath)).size
+
+      return {
+        indexedFiles: uniqueFiles,
+        totalChunks,
+      }
+    }
+    catch (error) {
+      console.warn(`[Context] ⚠️  Failed to retrieve collection stats for ${codebasePath}:`, error)
+      return null
+    }
+  }
+
+  /**
    * Clear index
    * @param codebasePath Codebase path to clear index for
    * @param progressCallback Optional progress callback function

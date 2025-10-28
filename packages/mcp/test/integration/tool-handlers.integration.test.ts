@@ -357,13 +357,14 @@ describe('tool Handlers Integration', () => {
       expect(result.content[0].text).not.toContain('not indexed')
       expect(result.content[0].text).toContain('Found')
 
-      // Verify: Snapshot was automatically synced and has correct (incomplete) stats
+      // Verify: Snapshot was automatically synced with actual stats from vector DB
       expect(snapshotManager.getIndexedCodebases()).toContain(fixturesPath)
       const info = snapshotManager.getCodebaseInfo(fixturesPath)
       expect(info?.status).toBe('indexed')
       if (info?.status === 'indexed') {
-        expect(info.indexedFiles).toBe(0)
-        expect(info.totalChunks).toBe(0)
+        // Stats should be retrieved from vector DB, not placeholder 0s
+        expect(info.indexedFiles).toBe(3) // 3 files in sample-codebase
+        expect(info.totalChunks).toBe(28) // 28 chunks total
       }
     })
   })
