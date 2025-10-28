@@ -470,8 +470,22 @@ export class ToolHandlers {
       trackCodebasePath(absolutePath)
 
       // Check if this codebase is indexed or being indexed
-      const isIndexed = this.snapshotManager.getIndexedCodebases().includes(absolutePath)
+      // IMPORTANT: Check both snapshot AND actual vector database collection
+      // to handle cases where snapshot is out of sync with cloud state
+      const isIndexedInSnapshot = this.snapshotManager.getIndexedCodebases().includes(absolutePath)
       const isIndexing = this.snapshotManager.getIndexingCodebases().includes(absolutePath)
+      const hasVectorCollection = await this.context.hasIndex(absolutePath)
+
+      // If collection exists in vector DB but not in snapshot, sync it
+      if (hasVectorCollection && !isIndexedInSnapshot && !isIndexing) {
+        console.log(`[SEARCH] Collection exists for '${absolutePath}' but not in snapshot - syncing state`)
+        // Add to snapshot as indexed (recovery from out-of-sync state)
+        this.snapshotManager.setCodebaseIndexed(absolutePath, { indexedFiles: 0, totalChunks: 0, status: 'completed' })
+        this.snapshotManager.saveCodebaseSnapshot()
+      }
+
+      // Use the combined check: either in snapshot OR has actual collection
+      const isIndexed = isIndexedInSnapshot || hasVectorCollection
 
       if (!isIndexed && !isIndexing) {
         return {

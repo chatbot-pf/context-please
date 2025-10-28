@@ -327,6 +327,39 @@ describe('tool Handlers Integration', () => {
       expect(result.isError).toBe(true)
       expect(result.content[0].text).toContain('Invalid file extensions')
     })
+
+    it('should auto-sync and allow search when collection exists but snapshot is missing (issue #37)', async () => {
+      // Regression test for https://github.com/chatbot-pf/context-please/issues/37
+      // Scenario: Collection exists in vector DB, but snapshot file is out of sync
+      // Expected: Should auto-recover by syncing state and allowing search
+
+      // Arrange: Index codebase (creates collection in vector DB)
+      await context.indexCodebase(fixturesPath)
+
+      // Simulate out-of-sync state: Collection exists, but snapshot thinks it's not indexed
+      // This can happen if snapshot file was deleted or corrupted
+      snapshotManager.reset() // Clear snapshot completely
+
+      // Verify precondition: snapshot doesn't know about the codebase
+      expect(snapshotManager.getIndexedCodebases()).not.toContain(fixturesPath)
+
+      // Verify precondition: collection still exists in vector DB
+      const hasCollection = await context.hasIndex(fixturesPath)
+      expect(hasCollection).toBe(true)
+
+      const args = { path: fixturesPath, query: 'user service', limit: 5 }
+
+      // Act: Search should auto-detect collection and sync state
+      const result = await handlers.handleSearchCode(args)
+
+      // Assert: Should succeed (not return "not indexed" error)
+      expect(result.isError).not.toBe(true)
+      expect(result.content[0].text).not.toContain('not indexed')
+      expect(result.content[0].text).toContain('Found')
+
+      // Verify: Snapshot was automatically synced
+      expect(snapshotManager.getIndexedCodebases()).toContain(fixturesPath)
+    })
   })
 
   describe('handleClearIndex', () => {
