@@ -338,7 +338,7 @@ describe('tool Handlers Integration', () => {
 
       // Simulate out-of-sync state: Collection exists, but snapshot thinks it's not indexed
       // This can happen if snapshot file was deleted or corrupted
-      snapshotManager.reset() // Clear snapshot completely
+      snapshotManager.reset() // Clear snapshot to simulate out-of-sync state (e.g., after file deletion or corruption)
 
       // Verify precondition: snapshot doesn't know about the codebase
       expect(snapshotManager.getIndexedCodebases()).not.toContain(fixturesPath)
@@ -357,8 +357,14 @@ describe('tool Handlers Integration', () => {
       expect(result.content[0].text).not.toContain('not indexed')
       expect(result.content[0].text).toContain('Found')
 
-      // Verify: Snapshot was automatically synced
+      // Verify: Snapshot was automatically synced and has correct (incomplete) stats
       expect(snapshotManager.getIndexedCodebases()).toContain(fixturesPath)
+      const info = snapshotManager.getCodebaseInfo(fixturesPath)
+      expect(info?.status).toBe('indexed')
+      if (info?.status === 'indexed') {
+        expect(info.indexedFiles).toBe(0)
+        expect(info.totalChunks).toBe(0)
+      }
     })
   })
 

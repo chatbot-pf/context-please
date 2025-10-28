@@ -479,7 +479,10 @@ export class ToolHandlers {
       // If collection exists in vector DB but not in snapshot, sync it
       if (hasVectorCollection && !isIndexedInSnapshot && !isIndexing) {
         console.log(`[SEARCH] Collection exists for '${absolutePath}' but not in snapshot - syncing state`)
+        console.warn(`[SEARCH] Recovering state for '${absolutePath}', but statistics will be incomplete (0 files, 0 chunks). This will be corrected on the next re-index.`)
         // Add to snapshot as indexed (recovery from out-of-sync state)
+        // TODO: Replace placeholder metadata with actual stats from vector DB if available.
+        //       This is important for accurate monitoring/debugging. See issue #TODO.
         this.snapshotManager.setCodebaseIndexed(absolutePath, { indexedFiles: 0, totalChunks: 0, status: 'completed' })
         this.snapshotManager.saveCodebaseSnapshot()
       }
