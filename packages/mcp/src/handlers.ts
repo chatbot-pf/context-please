@@ -476,28 +476,88 @@ export class ToolHandlers {
       const isIndexing = this.snapshotManager.getIndexingCodebases().includes(absolutePath)
       const hasVectorCollection = await this.context.hasIndex(absolutePath)
 
-      // If collection exists in vector DB but not in snapshot, sync it
+      // Recovery logic for out-of-sync state between snapshot and vector database
+      //
+      // This can occur when:
+      // 1. Snapshot file was manually deleted or corrupted
+      // 2. MCP server restarted before saving snapshot after indexing
+      // 3. Multiple MCP instances accessing the same vector database
+      // 4. User switched between different machines with shared cloud vector DB
+      //
+      // Strategy:
+      // - Detect: Collection exists in vector DB but snapshot doesn't know about it
+      // - Recover: Query vector DB for actual statistics and sync to snapshot
+      // - Result: User can search immediately without re-indexing
       if (hasVectorCollection && !isIndexedInSnapshot && !isIndexing) {
         console.log(`[SEARCH] Collection exists for '${absolutePath}' but not in snapshot - syncing state`)
 
-        // Try to retrieve actual statistics from vector database
-        const stats = await this.context.getCollectionStats(absolutePath)
+        try {
+          // Try to retrieve actual statistics from vector database
+          // This queries the collection to count unique files and total chunks
+          const stats = await this.context.getCollectionStats(absolutePath)
 
-        if (stats) {
-          console.log(`[SEARCH] Retrieved actual stats from vector DB: ${stats.indexedFiles} files, ${stats.totalChunks} chunks`)
-          this.snapshotManager.setCodebaseIndexed(absolutePath, {
-            indexedFiles: stats.indexedFiles,
-            totalChunks: stats.totalChunks,
-            status: 'completed',
-          })
-        }
-        else {
-          // Fallback to placeholder if stats retrieval fails
-          console.warn(`[SEARCH] Could not retrieve stats from vector DB for '${absolutePath}', using placeholder values (0 files, 0 chunks). This will be corrected on the next re-index.`)
-          this.snapshotManager.setCodebaseIndexed(absolutePath, { indexedFiles: 0, totalChunks: 0, status: 'completed' })
-        }
+          if (stats) {
+            console.log(`[SEARCH] Retrieved actual stats from vector DB: ${stats.indexedFiles} files, ${stats.totalChunks} chunks`)
+            this.snapshotManager.setCodebaseIndexed(absolutePath, {
+              indexedFiles: stats.indexedFiles,
+              totalChunks: stats.totalChunks,
+              status: 'completed',
+            })
 
-        this.snapshotManager.saveCodebaseSnapshot()
+            // Save snapshot with error handling
+            try {
+              this.snapshotManager.saveCodebaseSnapshot()
+              console.log(`[SEARCH] Successfully synced snapshot state for '${absolutePath}'`)
+            }
+            catch (saveError) {
+              console.error(`[SEARCH] Failed to save snapshot after sync: ${saveError}`)
+              // Continue with search since vector DB is the source of truth
+            }
+          }
+          else {
+            // Collection exists but stats query returned null (expected errors like collection not loaded)
+            // Return error to user instead of using placeholder values
+            return {
+              content: [{
+                type: 'text',
+                text: `Error: Collection exists for '${absolutePath}' but statistics could not be retrieved from the vector database.\n\n` +
+                      `This may indicate:\n` +
+                      `  - Collection is not loaded or in an invalid state\n` +
+                      `  - Vector database connectivity issues\n` +
+                      `\n` +
+                      `Recommended actions:\n` +
+                      `  1. Try searching again in a moment\n` +
+                      `  2. If the problem persists, re-index the codebase:\n` +
+                      `     index_codebase(path='${absolutePath}', force=true)\n` +
+                      `  3. Check your vector database connection settings`,
+              }],
+              isError: true,
+            }
+          }
+        }
+        catch (error) {
+          // Unexpected error from getCollectionStats (network failure, auth error, etc.)
+          console.error(`[SEARCH] Failed to retrieve collection stats during recovery:`, error)
+
+          return {
+            content: [{
+              type: 'text',
+              text: `Error: Failed to sync codebase '${absolutePath}' from vector database.\n\n` +
+                    `Error: ${error instanceof Error ? error.message : String(error)}\n\n` +
+                    `This may indicate:\n` +
+                    `  - Network connectivity issues with the vector database\n` +
+                    `  - Authentication or permission problems\n` +
+                    `  - Vector database service unavailable\n` +
+                    `\n` +
+                    `Recommended actions:\n` +
+                    `  1. Check your MILVUS_ADDRESS and MILVUS_TOKEN settings\n` +
+                    `  2. Verify network connectivity to the database\n` +
+                    `  3. Check the logs above for detailed error information\n` +
+                    `  4. Try re-indexing: index_codebase(path='${absolutePath}', force=true)`,
+            }],
+            isError: true,
+          }
+        }
       }
 
       // Use the combined check: either in snapshot OR has actual collection

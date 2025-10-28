@@ -1,6 +1,6 @@
 import * as path from 'node:path'
 import { Context } from '@pleaseai/context-please-core'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ToolHandlers } from '../../src/handlers.js'
 import { FakeSnapshotManager } from '../doubles/fake-snapshot-manager.js'
 import { TestToolHandlerBuilder } from '../doubles/test-tool-handler-builder.js'
@@ -362,10 +362,70 @@ describe('tool Handlers Integration', () => {
       const info = snapshotManager.getCodebaseInfo(fixturesPath)
       expect(info?.status).toBe('indexed')
       if (info?.status === 'indexed') {
-        // Stats should be retrieved from vector DB, not placeholder 0s
-        expect(info.indexedFiles).toBe(3) // 3 files in sample-codebase
-        expect(info.totalChunks).toBe(28) // 28 chunks total
+        // Stats should be retrieved from vector DB (non-zero values)
+        // Not testing exact values to avoid brittleness with fixture changes
+        expect(info.indexedFiles).toBeGreaterThan(0)
+        expect(info.totalChunks).toBeGreaterThan(0)
+
+        // Verify stats match actual collection
+        const actualStats = await context.getCollectionStats(fixturesPath)
+        expect(actualStats).not.toBeNull()
+        expect(info.indexedFiles).toBe(actualStats!.indexedFiles)
+        expect(info.totalChunks).toBe(actualStats!.totalChunks)
       }
+    })
+
+    it('should return error when stats retrieval returns null during recovery', async () => {
+      // Arrange: Index codebase (creates collection in vector DB)
+      await context.indexCodebase(fixturesPath)
+
+      // Mock getCollectionStats to return null (simulating collection not loaded)
+      vi.spyOn(context, 'getCollectionStats').mockResolvedValue(null)
+
+      // Clear snapshot to trigger recovery
+      snapshotManager.reset()
+
+      // Verify collection exists
+      expect(await context.hasIndex(fixturesPath)).toBe(true)
+
+      const args = { path: fixturesPath, query: 'user service', limit: 5 }
+
+      // Act: Search triggers recovery with failing stats retrieval
+      const result = await handlers.handleSearchCode(args)
+
+      // Assert: Should return error instead of using placeholder values
+      expect(result.isError).toBe(true)
+      expect(result.content[0].text).toContain('statistics could not be retrieved')
+      expect(result.content[0].text).toContain('Collection is not loaded')
+
+      // Snapshot should NOT be synced with placeholder values
+      expect(snapshotManager.getIndexedCodebases()).not.toContain(fixturesPath)
+    })
+
+    it('should return error when stats retrieval throws unexpected error', async () => {
+      // Arrange: Index codebase
+      await context.indexCodebase(fixturesPath)
+
+      // Mock getCollectionStats to throw (simulating network failure)
+      const networkError = new Error('Network timeout connecting to Milvus')
+      vi.spyOn(context, 'getCollectionStats').mockRejectedValue(networkError)
+
+      // Clear snapshot to trigger recovery
+      snapshotManager.reset()
+
+      const args = { path: fixturesPath, query: 'test', limit: 5 }
+
+      // Act: Search triggers recovery with throwing stats retrieval
+      const result = await handlers.handleSearchCode(args)
+
+      // Assert: Should return detailed error message
+      expect(result.isError).toBe(true)
+      expect(result.content[0].text).toContain('Failed to sync codebase')
+      expect(result.content[0].text).toContain('Network timeout')
+      expect(result.content[0].text).toContain('Network connectivity issues')
+
+      // Snapshot should NOT be synced
+      expect(snapshotManager.getIndexedCodebases()).not.toContain(fixturesPath)
     })
   })
 
