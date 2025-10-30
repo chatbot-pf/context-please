@@ -7,6 +7,7 @@ import {
   VectorDatabaseFactory,
   VectorDatabaseType,
 } from '../../src/vectordb/factory'
+import { FaissVectorDatabase } from '../../src/vectordb/faiss-vectordb'
 import { MilvusRestfulVectorDatabase } from '../../src/vectordb/milvus-restful-vectordb'
 import { MilvusVectorDatabase } from '../../src/vectordb/milvus-vectordb'
 import { QdrantVectorDatabase } from '../../src/vectordb/qdrant-vectordb'
@@ -53,6 +54,21 @@ describe('vectorDatabaseFactory', () => {
 
       expect(db).toBeInstanceOf(QdrantVectorDatabase)
       expect(db).toHaveProperty('createCollection')
+      expect(db).toHaveProperty('search')
+      expect(db).toHaveProperty('hybridSearch')
+    })
+
+    it('should create FaissVectorDatabase with FAISS_LOCAL type', () => {
+      const db = VectorDatabaseFactory.create(
+        VectorDatabaseType.FAISS_LOCAL,
+        {
+          storageDir: '/tmp/faiss-test',
+        },
+      )
+
+      expect(db).toBeInstanceOf(FaissVectorDatabase)
+      expect(db).toHaveProperty('createCollection')
+      expect(db).toHaveProperty('createHybridCollection')
       expect(db).toHaveProperty('search')
       expect(db).toHaveProperty('hybridSearch')
     })

@@ -83,9 +83,29 @@ export class FaissVectorDatabase extends BaseVectorDatabase<FaissConfig> {
    * Initialize FAISS storage directory
    */
   protected async initialize(): Promise<void> {
-    console.log('[FaissDB] 🔧 Initializing FAISS storage at:', this.storageDir)
-    await fs.ensureDir(this.storageDir)
-    console.log('[FaissDB] ✅ FAISS storage initialized')
+    try {
+      console.log('[FaissDB] 🔧 Initializing FAISS storage at:', this.storageDir)
+      await fs.ensureDir(this.storageDir)
+      console.log('[FaissDB] ✅ FAISS storage initialized')
+    }
+    catch (error: any) {
+      const errorMsg = `Failed to initialize FAISS storage at ${this.storageDir}: ${error.message}`
+      console.error(`[FaissDB] ❌ ${errorMsg}`)
+      console.error(`[FaissDB] Error code: ${error.code || 'UNKNOWN'}`)
+
+      if (error.code === 'EACCES') {
+        throw new Error(`${errorMsg}\nPermission denied. Check directory permissions.`)
+      }
+      else if (error.code === 'ENOSPC') {
+        throw new Error(`${errorMsg}\nDisk space exhausted. Free up disk space and try again.`)
+      }
+      else if (error.code === 'ENOENT') {
+        throw new Error(`${errorMsg}\nParent directory does not exist.`)
+      }
+      else {
+        throw new Error(errorMsg)
+      }
+    }
   }
 
   /**
@@ -119,37 +139,77 @@ export class FaissVectorDatabase extends BaseVectorDatabase<FaissConfig> {
 
     console.log('[FaissDB] 📂 Loading collection:', collectionName)
 
-    // Load metadata
-    const metadataPath = path.join(collectionPath, 'metadata.json')
-    const metadata: CollectionMetadata = await fs.readJson(metadataPath)
+    try {
+      // Load metadata
+      const metadataPath = path.join(collectionPath, 'metadata.json')
+      let metadata: CollectionMetadata
+      try {
+        metadata = await fs.readJson(metadataPath)
+      }
+      catch (error: any) {
+        throw new Error(
+          `Failed to load collection metadata from ${metadataPath}: ${error.message}. `
+          + `The metadata file may be corrupted. Try re-indexing the collection.`,
+        )
+      }
 
-    // Load FAISS index
-    const indexPath = path.join(collectionPath, 'dense.index')
-    const index = IndexFlatL2.read(indexPath)
+      // Load FAISS index
+      const indexPath = path.join(collectionPath, 'dense.index')
+      let index: IndexFlatL2
+      try {
+        index = IndexFlatL2.read(indexPath)
+      }
+      catch (error: any) {
+        throw new Error(
+          `Failed to load FAISS index from ${indexPath}: ${error.message}. `
+          + `The index file may be corrupted. Try re-indexing the collection.`,
+        )
+      }
 
-    // Load documents
-    const documentsPath = path.join(collectionPath, 'documents.json')
-    const documentsArray: DocumentMetadata[] = await fs.readJson(documentsPath)
-    const documents = new Map(documentsArray.map((doc) => [doc.id, doc]))
+      // Load documents
+      const documentsPath = path.join(collectionPath, 'documents.json')
+      let documentsArray: DocumentMetadata[]
+      try {
+        documentsArray = await fs.readJson(documentsPath)
+      }
+      catch (error: any) {
+        throw new Error(
+          `Failed to load documents metadata from ${documentsPath}: ${error.message}. `
+          + `The documents file may be corrupted. Try re-indexing the collection.`,
+        )
+      }
+      const documents = new Map(documentsArray.map((doc) => [doc.id, doc]))
 
-    // Load BM25 model if hybrid collection
-    let bm25: SimpleBM25 | undefined
-    if (metadata.isHybrid) {
-      const bm25Path = path.join(collectionPath, 'sparse.json')
-      const bm25Data = await fs.readJson(bm25Path)
-      bm25 = new SimpleBM25(this.config.bm25Config)
-      this.deserializeBM25(bm25, bm25Data)
+      // Load BM25 model if hybrid collection
+      let bm25: SimpleBM25 | undefined
+      if (metadata.isHybrid) {
+        const bm25Path = path.join(collectionPath, 'sparse.json')
+        try {
+          const bm25Json = await fs.readFile(bm25Path, 'utf-8')
+          bm25 = SimpleBM25.fromJSON(bm25Json)
+        }
+        catch (error: any) {
+          throw new Error(
+            `Failed to load BM25 model from ${bm25Path}: ${error.message}. `
+            + `The BM25 file may be corrupted. Try re-indexing the collection.`,
+          )
+        }
+      }
+
+      this.collections.set(collectionName, {
+        index,
+        metadata,
+        documents,
+        bm25,
+      })
+
+      console.log('[FaissDB] ✅ Loaded collection:', collectionName)
+      console.log('[FaissDB] 📊 Document count:', documents.size)
     }
-
-    this.collections.set(collectionName, {
-      index,
-      metadata,
-      documents,
-      bm25,
-    })
-
-    console.log('[FaissDB] ✅ Loaded collection:', collectionName)
-    console.log('[FaissDB] 📊 Document count:', documents.size)
+    catch (error: any) {
+      console.error(`[FaissDB] ❌ Failed to load collection ${collectionName}:`, error.message)
+      throw error
+    }
   }
 
   /**
@@ -162,53 +222,64 @@ export class FaissVectorDatabase extends BaseVectorDatabase<FaissConfig> {
     }
 
     const collectionPath = this.getCollectionPath(collectionName)
-    await fs.ensureDir(collectionPath)
 
-    // Save FAISS index
-    const indexPath = path.join(collectionPath, 'dense.index')
-    collection.index.write(indexPath)
-
-    // Save metadata
-    const metadataPath = path.join(collectionPath, 'metadata.json')
-    await fs.writeJson(metadataPath, collection.metadata, { spaces: 2 })
-
-    // Save documents
-    const documentsPath = path.join(collectionPath, 'documents.json')
-    const documentsArray = Array.from(collection.documents.values())
-    await fs.writeJson(documentsPath, documentsArray, { spaces: 2 })
-
-    // Save BM25 model if hybrid collection
-    if (collection.bm25 && collection.metadata.isHybrid) {
-      const bm25Path = path.join(collectionPath, 'sparse.json')
-      const bm25Data = this.serializeBM25(collection.bm25)
-      await fs.writeJson(bm25Path, bm25Data, { spaces: 2 })
+    try {
+      await fs.ensureDir(collectionPath)
+    }
+    catch (error: any) {
+      const errorMsg = `Failed to create collection directory ${collectionPath}: ${error.message}`
+      console.error(`[FaissDB] ❌ ${errorMsg}`)
+      throw new Error(errorMsg)
     }
 
-    console.log('[FaissDB] 💾 Saved collection:', collectionName)
-  }
+    try {
+      // Save FAISS index
+      const indexPath = path.join(collectionPath, 'dense.index')
+      try {
+        collection.index.write(indexPath)
+      }
+      catch (error: any) {
+        throw new Error(`Failed to write FAISS index to ${indexPath}: ${error.message}`)
+      }
 
-  /**
-   * Serialize BM25 model to JSON
-   */
-  private serializeBM25(bm25: SimpleBM25): any {
-    return {
-      vocabulary: Array.from(bm25.getVocabulary().entries()),
-      idf: Array.from(bm25.getIDFScores().entries()),
-      avgDocLength: bm25.getAverageDocumentLength(),
-      trained: bm25.isTrained(),
+      // Save metadata
+      const metadataPath = path.join(collectionPath, 'metadata.json')
+      try {
+        await fs.writeJson(metadataPath, collection.metadata, { spaces: 2 })
+      }
+      catch (error: any) {
+        throw new Error(`Failed to write metadata to ${metadataPath}: ${error.message}`)
+      }
+
+      // Save documents
+      const documentsPath = path.join(collectionPath, 'documents.json')
+      const documentsArray = Array.from(collection.documents.values())
+      try {
+        await fs.writeJson(documentsPath, documentsArray, { spaces: 2 })
+      }
+      catch (error: any) {
+        throw new Error(`Failed to write documents to ${documentsPath}: ${error.message}`)
+      }
+
+      // Save BM25 model if hybrid collection
+      if (collection.bm25 && collection.metadata.isHybrid) {
+        const bm25Path = path.join(collectionPath, 'sparse.json')
+        try {
+          const bm25Json = collection.bm25.toJSON()
+          await fs.writeFile(bm25Path, bm25Json, 'utf-8')
+        }
+        catch (error: any) {
+          throw new Error(`Failed to write BM25 model to ${bm25Path}: ${error.message}`)
+        }
+      }
+
+      console.log('[FaissDB] 💾 Saved collection:', collectionName)
     }
-  }
-
-  /**
-   * Deserialize BM25 model from JSON
-   */
-  private deserializeBM25(bm25: SimpleBM25, data: any): void {
-    // Use reflection to access private properties
-    // This is a workaround since SimpleBM25 doesn't have a deserialize method
-    (bm25 as any).vocabulary = new Map(data.vocabulary);
-    (bm25 as any).idf = new Map(data.idf);
-    (bm25 as any).avgDocLength = data.avgDocLength;
-    (bm25 as any).trained = data.trained
+    catch (error: any) {
+      console.error(`[FaissDB] ❌ Failed to save collection ${collectionName}:`, error.message)
+      console.error(`[FaissDB] Collection may be in an inconsistent state. Consider re-indexing.`)
+      throw error
+    }
   }
 
   /**
@@ -659,6 +730,19 @@ export class FaissVectorDatabase extends BaseVectorDatabase<FaissConfig> {
 
   /**
    * Delete documents by IDs
+   *
+   * ⚠️ NOT IMPLEMENTED: FAISS does not support document deletion
+   *
+   * The FAISS IndexFlatL2 library does not provide a way to remove vectors
+   * from an existing index. To fully remove documents, you must:
+   *
+   * 1. Drop the collection using dropCollection()
+   * 2. Recreate it using createCollection() or createHybridCollection()
+   * 3. Re-insert all documents except the ones you want to delete
+   *
+   * @throws Error Always throws - deletion is not supported
+   * @param collectionName Collection name
+   * @param ids Document IDs to delete (not used)
    */
   async delete(collectionName: string, ids: string[]): Promise<void> {
     await this.ensureInitialized()
@@ -669,40 +753,32 @@ export class FaissVectorDatabase extends BaseVectorDatabase<FaissConfig> {
       throw new Error(`Collection ${collectionName} not found`)
     }
 
-    console.log('[FaissDB] 🗑️  Deleting documents:', ids.length)
+    console.error(`[FaissDB] ❌ FAISS does not support document deletion`)
+    console.error(`[FaissDB] ❌ Attempted to delete ${ids.length} document(s) from collection '${collectionName}'`)
 
-    // FAISS doesn't support deletion, so we need to rebuild the index
-    const remainingDocs: DocumentMetadata[] = []
-    const remainingVectors: number[][] = []
-    const documentsArray = Array.from(collection.documents.values())
-
-    // Get all vectors (we need to search to get them)
-    for (const doc of documentsArray) {
-      if (!ids.includes(doc.id)) {
-        remainingDocs.push(doc)
-        // Note: We can't retrieve the original vector from FAISS
-        // This is a limitation - we'd need to store vectors separately
-        // For now, we'll throw an error
-      }
-    }
-
-    // Remove from documents map
-    ids.forEach((id) => collection.documents.delete(id))
-
-    // Update metadata
-    collection.metadata.documentCount = collection.documents.size
-
-    // Note: FAISS index cannot be updated, it still contains old vectors
-    // This is a known limitation of the current implementation
-    // For production use, we'd need to store vectors separately and rebuild
-
-    await this.saveCollection(collectionName)
-    console.log('[FaissDB] ⚠️  Documents removed from metadata, but FAISS index not rebuilt')
-    console.log('[FaissDB] ⚠️  To fully remove, drop and recreate the collection')
+    throw new Error(
+      `FAISS does not support document deletion. `
+      + `To remove documents from collection '${collectionName}', you must:\n`
+      + `  1. Drop the collection using dropCollection()\n`
+      + `  2. Recreate it using createCollection() or createHybridCollection()\n`
+      + `  3. Re-insert all documents except the ones you want to delete\n\n`
+      + `Attempted to delete document IDs: ${ids.join(', ')}`,
+    )
   }
 
   /**
    * Query documents with filter conditions
+   *
+   * ⚠️ LIMITATION: Filter parameter is currently ignored
+   *
+   * This method returns ALL documents in the collection (up to limit),
+   * not filtered results. Filter parsing is not yet implemented for FAISS.
+   *
+   * @param collectionName Collection name
+   * @param filter Filter expression (currently ignored - returns all documents)
+   * @param outputFields Fields to return in results
+   * @param limit Maximum number of results (only limit is enforced)
+   * @returns All documents with specified fields (up to limit)
    */
   async query(
     collectionName: string,
@@ -718,10 +794,13 @@ export class FaissVectorDatabase extends BaseVectorDatabase<FaissConfig> {
       throw new Error(`Collection ${collectionName} not found`)
     }
 
-    console.log('[FaissDB] 🔍 Querying documents with filter')
+    if (filter && filter.trim() !== '') {
+      console.warn(`[FaissDB] ⚠️  Query filters are not implemented. Filter '${filter}' will be ignored.`)
+      console.warn(`[FaissDB] ⚠️  All documents will be returned (up to limit). Consider using another vector database if filtering is required.`)
+    }
 
-    // Simple filter implementation
-    // In production, this would need a proper query parser
+    console.log('[FaissDB] 🔍 Querying documents (no filter support)')
+
     const results: Record<string, any>[] = []
 
     for (const doc of collection.documents.values()) {
