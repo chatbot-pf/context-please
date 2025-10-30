@@ -593,6 +593,102 @@ export class Context {
   }
 
   /**
+   * Get collection statistics from vector database
+   *
+   * Retrieves actual counts of indexed files and chunks by querying the vector database.
+   * This is more accurate than snapshot data which may be out of sync.
+   *
+   * @param codebasePath Codebase path to get stats for
+   * @returns Object with indexedFiles (unique files) and totalChunks, or null if:
+   *   - Collection doesn't exist in vector database
+   *   - Collection cannot be loaded (expected error)
+   *   - Query fails with known recoverable error
+   *
+   * @throws Error for unexpected failures (network errors, auth failures, programming bugs)
+   *
+   * @remarks
+   * - Uses a limit of 100k chunks. For larger codebases, stats may be underreported.
+   * - Queries only relativePath field to minimize data transfer
+   * - File count is derived by counting unique relativePath values
+   * - Performance: O(n) where n is min(actualChunks, 100000)
+   * - Warns if limit is reached (may indicate incomplete stats)
+   */
+  async getCollectionStats(codebasePath: string): Promise<{ indexedFiles: number, totalChunks: number } | null> {
+    const collectionName = this.getCollectionName(codebasePath)
+
+    // Check if collection exists
+    const hasCollection = await this.vectorDatabase.hasCollection(collectionName)
+    if (!hasCollection) {
+      return null
+    }
+
+    try {
+      // Query documents up to limit (may not retrieve all chunks if codebase exceeds this limit)
+      // Note: This is a best-effort approach. For codebases with >100k chunks, consider pagination.
+      const allDocs = await this.vectorDatabase.query(
+        collectionName,
+        '', // Empty filter expression (no filtering, query all documents)
+        ['relativePath'], // Only need file path for counting
+        100000, // Attempt to retrieve up to 100k chunks (actual limit may vary by vector DB implementation)
+      )
+
+      const totalChunks = allDocs.length
+
+      // Warn if we hit the query limit - actual collection may be larger
+      if (totalChunks === 100000) {
+        console.warn(
+          `[Context] ⚠️  Retrieved maximum limit of 100k chunks for ${codebasePath}. ` +
+          `Actual total may be higher. Stats may be incomplete.`,
+        )
+      }
+
+      // Filter out documents with missing relativePath before counting
+      const validPaths = allDocs
+        .map((doc) => doc.relativePath)
+        .filter((path): path is string => path != null && path !== '')
+
+      const uniqueFiles = new Set(validPaths).size
+
+      return {
+        indexedFiles: uniqueFiles,
+        totalChunks,
+      }
+    }
+    catch (error) {
+      const dbType = this.vectorDatabase.constructor.name
+
+      // Log with full context for debugging
+      console.error(
+        `[Context] ❌ Failed to retrieve collection stats\n` +
+        `  Codebase: ${codebasePath}\n` +
+        `  Collection: ${collectionName}\n` +
+        `  Database: ${dbType}\n` +
+        `  Error:`,
+        error,
+      )
+
+      // Only catch specific expected errors - let unexpected errors propagate
+      if (error instanceof Error) {
+        const errorMsg = error.message
+
+        // Known recoverable errors that should return null
+        if (
+          errorMsg.includes('collection not loaded') ||
+          errorMsg.includes('collection not exist') ||
+          errorMsg.includes('Failed to query')
+        ) {
+          console.warn(`[Context] ⚠️  Collection exists but query failed (recoverable): ${errorMsg}`)
+          return null
+        }
+      }
+
+      // All other errors indicate serious problems and should propagate
+      // (network failures, auth errors, programming bugs, etc.)
+      throw error
+    }
+  }
+
+  /**
    * Clear index
    * @param codebasePath Codebase path to clear index for
    * @param progressCallback Optional progress callback function
