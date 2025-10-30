@@ -1,4 +1,4 @@
-import { SparseVector, SparseVectorConfig } from './types';
+import type { SparseVector, SparseVectorConfig } from './types'
 
 /**
  * Abstract interface for sparse vector generation
@@ -14,46 +14,46 @@ import { SparseVector, SparseVectorConfig } from './types';
  * 3. Support both single document and batch processing
  */
 export interface SparseVectorGenerator {
-    /**
-     * Learn vocabulary and statistics from a corpus of documents
-     * This should be called during indexing to build IDF statistics
-     *
-     * @param documents - Array of document texts to learn from
-     */
-    learn(documents: string[]): void;
+  /**
+   * Learn vocabulary and statistics from a corpus of documents
+   * This should be called during indexing to build IDF statistics
+   *
+   * @param documents - Array of document texts to learn from
+   */
+  learn: (documents: string[]) => void
 
-    /**
-     * Generate sparse vector for a single text
-     *
-     * @param text - Input text to vectorize
-     * @param config - Optional configuration for vector generation
-     * @returns Sparse vector with indices and values
-     */
-    generate(text: string, config?: SparseVectorConfig): SparseVector;
+  /**
+   * Generate sparse vector for a single text
+   *
+   * @param text - Input text to vectorize
+   * @param config - Optional configuration for vector generation
+   * @returns Sparse vector with indices and values
+   */
+  generate: (text: string, config?: SparseVectorConfig) => SparseVector
 
-    /**
-     * Generate sparse vectors for multiple texts (batch operation)
-     *
-     * @param texts - Array of input texts to vectorize
-     * @param config - Optional configuration for vector generation
-     * @returns Array of sparse vectors
-     */
-    generateBatch(texts: string[], config?: SparseVectorConfig): SparseVector[];
+  /**
+   * Generate sparse vectors for multiple texts (batch operation)
+   *
+   * @param texts - Array of input texts to vectorize
+   * @param config - Optional configuration for vector generation
+   * @returns Array of sparse vectors
+   */
+  generateBatch: (texts: string[], config?: SparseVectorConfig) => SparseVector[]
 
-    /**
-     * Get the vocabulary size (number of unique terms)
-     * Useful for debugging and understanding the sparse vector space
-     */
-    getVocabularySize(): number;
+  /**
+   * Get the vocabulary size (number of unique terms)
+   * Useful for debugging and understanding the sparse vector space
+   */
+  getVocabularySize: () => number
 
-    /**
-     * Get average document length from the learned corpus
-     * Used for BM25 length normalization
-     */
-    getAverageDocumentLength(): number;
+  /**
+   * Get average document length from the learned corpus
+   * Used for BM25 length normalization
+   */
+  getAverageDocumentLength: () => number
 
-    /**
-     * Check if the generator has been trained (learned from corpus)
-     */
-    isTrained(): boolean;
+  /**
+   * Check if the generator has been trained (learned from corpus)
+   */
+  isTrained: () => boolean
 }

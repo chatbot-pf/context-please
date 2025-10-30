@@ -11,6 +11,7 @@ This guide covers development specific to the core indexing engine.
 ## Development Workflow
 
 ### Quick Commands
+
 ```bash
 # Build core package
 pnpm build:core
@@ -42,4 +43,4 @@ pnpm dev:core
 ## Questions?
 
 - **General questions**: See [main contributing guide](../../CONTRIBUTING.md)
-- **Core-specific issues**: Open an issue with the `core` label 
+- **Core-specific issues**: Open an issue with the `core` label

@@ -204,11 +204,14 @@ def create_efficiency_chart(both_results: Dict, grep_results: Dict):
         )
 
     # Add improvement annotation for tokens
-    token_reduction = (
-        (grep_results["avg_tokens"] - both_results["avg_tokens"])
-        / grep_results["avg_tokens"]
-        * 100
-    )
+    if grep_results["avg_tokens"] > 0:
+        token_reduction = (
+            (grep_results["avg_tokens"] - both_results["avg_tokens"])
+            / grep_results["avg_tokens"]
+            * 100
+        )
+    else:
+        token_reduction = 0
     mid_height = max(token_values) * 0.8
     ax1.annotate(
         f"-{token_reduction:.1f}%",
@@ -264,11 +267,14 @@ def create_efficiency_chart(both_results: Dict, grep_results: Dict):
         )
 
     # Add improvement annotation for tool calls
-    tool_reduction = (
-        (grep_results["avg_tools"] - both_results["avg_tools"])
-        / grep_results["avg_tools"]
-        * 100
-    )
+    if grep_results["avg_tools"] > 0:
+        tool_reduction = (
+            (grep_results["avg_tools"] - both_results["avg_tools"])
+            / grep_results["avg_tools"]
+            * 100
+        )
+    else:
+        tool_reduction = 0
     mid_height = max(tool_values) * 0.8
     ax2.annotate(
         f"-{tool_reduction:.1f}%",

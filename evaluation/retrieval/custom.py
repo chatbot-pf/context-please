@@ -86,16 +86,35 @@ class CustomRetrieval(BaseRetrieval):
 
         # Add CC server if needed
         if "cc" in self.retrieval_types:
+            # Prepare environment variables based on vector database type
+            env_vars = {
+                "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY"),
+                "EMBEDDING_BATCH_SIZE": os.getenv("EMBEDDING_BATCH_SIZE", "100"),
+            }
+
+            # Check which vector database to use
+            vector_db_type = os.getenv("VECTOR_DB_TYPE", "milvus").lower()
+
+            if vector_db_type == "qdrant":
+                # Qdrant configuration
+                env_vars["VECTOR_DB_TYPE"] = "qdrant"
+                if os.getenv("QDRANT_URL"):
+                    env_vars["QDRANT_URL"] = os.getenv("QDRANT_URL")
+                if os.getenv("QDRANT_API_KEY"):
+                    env_vars["QDRANT_API_KEY"] = os.getenv("QDRANT_API_KEY")
+            else:
+                # Milvus configuration (default)
+                if os.getenv("MILVUS_ADDRESS"):
+                    env_vars["MILVUS_ADDRESS"] = os.getenv("MILVUS_ADDRESS")
+                if os.getenv("MILVUS_TOKEN"):
+                    env_vars["MILVUS_TOKEN"] = os.getenv("MILVUS_TOKEN")
+
             servers["claude-context"] = {
-                # "command": "node",
-                # "args": [str(project_path / "packages/mcp/dist/index.js")],  # For development environment
-                "command": "npx",
-                "args": ["-y", "@pleaseai/context-please-mcp@0.1.0"],  # For reproduction environment
-                "env": {
-                    "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY"),
-                    "MILVUS_ADDRESS": os.getenv("MILVUS_ADDRESS"),
-                    "EMBEDDING_BATCH_SIZE": os.getenv("EMBEDDING_BATCH_SIZE", "100"),
-                },
+                "command": "node",
+                "args": [str(project_path / "packages/mcp/dist/index.js")],  # For development environment
+                # "command": "npx",
+                # "args": ["-y", "@pleaseai/context-please-mcp@0.2.1"],  # For reproduction environment
+                "env": env_vars,
                 "transport": "stdio",
             }
 
@@ -251,6 +270,11 @@ class CustomRetrieval(BaseRetrieval):
         if "cc" not in self.retrieval_types:
             return
 
+        # Skip indexing if SKIP_INDEXING environment variable is set
+        if os.getenv("SKIP_INDEXING", "").lower() in ["true", "1", "yes"]:
+            logger.info(f"⏭️  Skipping indexing for {repo_path} (SKIP_INDEXING={os.getenv('SKIP_INDEXING')})")
+            return
+
         async with self.mcp_sessions_context() as tools:
             index_tool = tools["index_tool"]
             indexing_status_tool = tools["indexing_status_tool"]
@@ -326,7 +350,10 @@ class CustomRetrieval(BaseRetrieval):
         asyncio.run(self.async_run(root_dir, token))
 
     async def async_run(self, root_dir: str, token: str = "git") -> None:
-        for instance in tqdm(self.instances, desc="Running retrieval"):
+        # Process only the first 2 instances for testing
+        test_instances = self.instances
+
+        for instance in tqdm(test_instances, desc="Running retrieval"):
             instance_id = instance["instance_id"]
             repo = instance["repo"]
             commit = instance["base_commit"]

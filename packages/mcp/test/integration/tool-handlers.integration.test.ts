@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import * as path from 'path';
-import { TestToolHandlerBuilder } from '../doubles/test-tool-handler-builder.js';
-import { ToolHandlers } from '../../src/handlers.js';
-import { FakeSnapshotManager } from '../doubles/fake-snapshot-manager.js';
-import { Context } from '@pleaseai/context-please-core';
+import * as path from 'node:path'
+import { Context } from '@pleaseai/context-please-core'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ToolHandlers } from '../../src/handlers.js'
+import { FakeSnapshotManager } from '../doubles/fake-snapshot-manager.js'
+import { TestToolHandlerBuilder } from '../doubles/test-tool-handler-builder.js'
 
 /**
  * Integration tests for MCP ToolHandlers
@@ -14,599 +14,699 @@ import { Context } from '@pleaseai/context-please-core';
  * - clear_index
  * - get_indexing_status
  */
-describe('Tool Handlers Integration', () => {
-    let handlers: ToolHandlers;
-    let context: Context;
-    let snapshotManager: FakeSnapshotManager;
-    let fixturesPath: string;
-
-    beforeEach(() => {
-        // Create test setup with fake dependencies
-        const setup = TestToolHandlerBuilder.createDefault();
-        handlers = setup.handlers;
-        context = setup.context;
-        snapshotManager = setup.snapshotManager;
-
-        // Path to shared test fixtures from core package
-        fixturesPath = path.join(__dirname, '../../../core/test/fixtures/sample-codebase');
-    });
-
-    afterEach(() => {
-        // Reset all test doubles
-        snapshotManager.reset();
-    });
-
-    describe('handleIndexCodebase', () => {
-        it('should start indexing a valid codebase path', async () => {
-            // Arrange
-            const args = { path: fixturesPath, force: false, splitter: 'ast' };
-
-            // Act
-            const result = await handlers.handleIndexCodebase(args);
-
-            // Assert
-            expect(result.content).toBeDefined();
-            expect(result.content[0].type).toBe('text');
-            expect(result.content[0].text).toContain('Started background indexing');
-            expect(result.content[0].text).toContain(fixturesPath);
-
-            // Check snapshot manager state
-            const indexingCodebases = snapshotManager.getIndexingCodebases();
-            expect(indexingCodebases).toContain(fixturesPath);
-        });
-
-        it('should reject non-existent path', async () => {
-            // Arrange
-            const nonExistentPath = '/path/that/does/not/exist';
-            const args = { path: nonExistentPath, force: false, splitter: 'ast' };
-
-            // Act
-            const result = await handlers.handleIndexCodebase(args);
-
-            // Assert
-            expect(result.isError).toBe(true);
-            expect(result.content[0].text).toContain('does not exist');
-        });
-
-        it('should reject already indexed codebase without force flag', async () => {
-            // Arrange: Actually index the codebase first (creates collection in fake DB)
-            await context.indexCodebase(fixturesPath);
-
-            // Mark as indexed in snapshot
-            snapshotManager.setCodebaseIndexed(fixturesPath, {
-                indexedFiles: 3,
-                totalChunks: 10,
-                status: 'completed'
-            });
-
-            const args = { path: fixturesPath, force: false, splitter: 'ast' };
-
-            // Act
-            const result = await handlers.handleIndexCodebase(args);
-
-            // Assert
-            expect(result.isError).toBe(true);
-            expect(result.content[0].text).toContain('already indexed');
-            expect(result.content[0].text).toContain('force=true');
-        });
-
-        it('should allow re-indexing with force flag', async () => {
-            // Arrange: Actually index the codebase first
-            await context.indexCodebase(fixturesPath);
-
-            snapshotManager.setCodebaseIndexed(fixturesPath, {
-                indexedFiles: 3,
-                totalChunks: 10,
-                status: 'completed'
-            });
-
-            const args = { path: fixturesPath, force: true, splitter: 'ast' };
-
-            // Act
-            const result = await handlers.handleIndexCodebase(args);
-
-            // Assert
-            expect(result.isError).not.toBe(true);
-            expect(result.content[0].text).toContain('Started background indexing');
-        });
-
-        it('should reject codebase that is currently indexing', async () => {
-            // Arrange
-            snapshotManager.setCodebaseIndexing(fixturesPath, 50);
-
-            const args = { path: fixturesPath, force: false, splitter: 'ast' };
-
-            // Act
-            const result = await handlers.handleIndexCodebase(args);
-
-            // Assert
-            expect(result.isError).toBe(true);
-            expect(result.content[0].text).toContain('already being indexed');
-        });
-
-        it('should handle custom extensions parameter', async () => {
-            // Arrange
-            const args = {
-                path: fixturesPath,
-                force: false,
-                splitter: 'ast',
-                customExtensions: ['.vue', '.svelte']
-            };
-
-            // Act
-            const result = await handlers.handleIndexCodebase(args);
-
-            // Assert
-            expect(result.content[0].text).toContain('Started background indexing');
-            expect(result.content[0].text).toContain('custom extensions');
-        });
-
-        it('should handle custom ignore patterns parameter', async () => {
-            // Arrange
-            const args = {
-                path: fixturesPath,
-                force: false,
-                splitter: 'ast',
-                ignorePatterns: ['static/**', '*.tmp']
-            };
-
-            // Act
-            const result = await handlers.handleIndexCodebase(args);
-
-            // Assert
-            expect(result.content[0].text).toContain('Started background indexing');
-            expect(result.content[0].text).toContain('custom ignore patterns');
-        });
-
-        it('should reject invalid splitter type', async () => {
-            // Arrange
-            const args = { path: fixturesPath, force: false, splitter: 'invalid' };
-
-            // Act
-            const result = await handlers.handleIndexCodebase(args);
-
-            // Assert
-            expect(result.isError).toBe(true);
-            expect(result.content[0].text).toContain('Invalid splitter type');
-        });
-    });
-
-    describe('handleSearchCode', () => {
-        it('should return error for non-indexed codebase', async () => {
-            // Arrange
-            const args = { path: fixturesPath, query: 'test query', limit: 10 };
-
-            // Act
-            const result = await handlers.handleSearchCode(args);
-
-            // Assert
-            expect(result.isError).toBe(true);
-            expect(result.content[0].text).toContain('not indexed');
-            expect(result.content[0].text).toContain('index_codebase');
-        });
-
-        it('should return error for non-existent path', async () => {
-            // Arrange
-            const nonExistentPath = '/path/that/does/not/exist';
-            const args = { path: nonExistentPath, query: 'test', limit: 10 };
-
-            // Act
-            const result = await handlers.handleSearchCode(args);
-
-            // Assert
-            expect(result.isError).toBe(true);
-            expect(result.content[0].text).toContain('does not exist');
-        });
-
-        it('should allow search on indexing codebase with warning', async () => {
-            // Arrange: Set codebase as indexing
-            snapshotManager.setCodebaseIndexing(fixturesPath, 50);
-
-            // Index the codebase first (simulate background indexing started)
-            await context.indexCodebase(fixturesPath);
-
-            const args = { path: fixturesPath, query: 'user', limit: 5 };
-
-            // Act
-            const result = await handlers.handleSearchCode(args);
-
-            // Assert
-            expect(result.isError).not.toBe(true);
-            expect(result.content[0].text).toContain('Indexing in Progress');
-        });
-
-        it('should return search results for indexed codebase', async () => {
-            // Arrange: Index and mark as indexed
-            await context.indexCodebase(fixturesPath);
-            snapshotManager.setCodebaseIndexed(fixturesPath, {
-                indexedFiles: 3,
-                totalChunks: 28,
-                status: 'completed'
-            });
-
-            const args = { path: fixturesPath, query: 'user service', limit: 5 };
-
-            // Act
-            const result = await handlers.handleSearchCode(args);
-
-            // Assert
-            expect(result.isError).not.toBe(true);
-            expect(result.content[0].text).toContain('Found');
-            expect(result.content[0].text).toContain('results');
-        });
-
-        it('should handle no results gracefully', async () => {
-            // Arrange
-            await context.indexCodebase(fixturesPath);
-            snapshotManager.setCodebaseIndexed(fixturesPath, {
-                indexedFiles: 3,
-                totalChunks: 28,
-                status: 'completed'
-            });
-
-            const args = { path: fixturesPath, query: 'xyznonexistent999', limit: 5 };
-
-            // Act
-            const result = await handlers.handleSearchCode(args);
-
-            // Assert
-            expect(result.isError).not.toBe(true);
-            // Note: Fake embeddings may still find results due to deterministic hashing
-            // The important thing is it doesn't error
-            expect(result.content[0].text).toBeDefined();
-        });
-
-        it('should respect limit parameter', async () => {
-            // Arrange
-            await context.indexCodebase(fixturesPath);
-            snapshotManager.setCodebaseIndexed(fixturesPath, {
-                indexedFiles: 3,
-                totalChunks: 28,
-                status: 'completed'
-            });
-
-            const args = { path: fixturesPath, query: 'function', limit: 3 };
-
-            // Act
-            const result = await handlers.handleSearchCode(args);
-
-            // Assert
-            expect(result.isError).not.toBe(true);
-            // Should not return more than requested limit
-            const resultCount = (result.content[0].text.match(/\d+\. Code snippet/g) || []).length;
-            expect(resultCount).toBeLessThanOrEqual(3);
-        });
-
-        it('should handle extensionFilter parameter', async () => {
-            // Arrange
-            await context.indexCodebase(fixturesPath);
-            snapshotManager.setCodebaseIndexed(fixturesPath, {
-                indexedFiles: 3,
-                totalChunks: 28,
-                status: 'completed'
-            });
-
-            const args = {
-                path: fixturesPath,
-                query: 'function',
-                limit: 10,
-                extensionFilter: ['.ts']
-            };
-
-            // Act
-            const result = await handlers.handleSearchCode(args);
-
-            // Assert
-            expect(result.isError).not.toBe(true);
-            // Results should only contain .ts files
-            if (result.content[0].text.includes('Code snippet')) {
-                expect(result.content[0].text).not.toContain('.py');
-            }
-        });
-
-        it('should reject invalid extension filter format', async () => {
-            // Arrange
-            await context.indexCodebase(fixturesPath);
-            snapshotManager.setCodebaseIndexed(fixturesPath, {
-                indexedFiles: 3,
-                totalChunks: 28,
-                status: 'completed'
-            });
-
-            const args = {
-                path: fixturesPath,
-                query: 'function',
-                limit: 10,
-                extensionFilter: ['invalid']  // Missing dot prefix
-            };
-
-            // Act
-            const result = await handlers.handleSearchCode(args);
-
-            // Assert
-            expect(result.isError).toBe(true);
-            expect(result.content[0].text).toContain('Invalid file extensions');
-        });
-    });
-
-    describe('handleClearIndex', () => {
-        it('should clear indexed codebase successfully', async () => {
-            // Arrange
-            await context.indexCodebase(fixturesPath);
-            snapshotManager.setCodebaseIndexed(fixturesPath, {
-                indexedFiles: 3,
-                totalChunks: 28,
-                status: 'completed'
-            });
-
-            const args = { path: fixturesPath };
-
-            // Act
-            const result = await handlers.handleClearIndex(args);
-
-            // Assert
-            expect(result.isError).not.toBe(true);
-            expect(result.content[0].text).toContain('Successfully cleared');
-
-            // Verify codebase was removed from snapshot
-            const indexedCodebases = snapshotManager.getIndexedCodebases();
-            expect(indexedCodebases).not.toContain(fixturesPath);
-        });
-
-        it('should handle clearing non-existent path', async () => {
-            // Arrange: First index something so we bypass the "no codebases" early return
-            await context.indexCodebase(path.join(__dirname, '../../../core/test/fixtures/empty-dir'));
-            snapshotManager.setCodebaseIndexed(path.join(__dirname, '../../../core/test/fixtures/empty-dir'), {
-                indexedFiles: 0,
-                totalChunks: 0,
-                status: 'completed'
-            });
-
-            const nonExistentPath = '/path/that/does/not/exist';
-            const args = { path: nonExistentPath };
-
-            // Act
-            const result = await handlers.handleClearIndex(args);
-
-            // Assert
-            expect(result.isError).toBe(true);
-            expect(result.content[0].text).toContain('does not exist');
-        });
-
-        it('should handle clearing non-indexed codebase', async () => {
-            // Arrange: Index a different codebase so we bypass "no codebases" early return
-            const otherPath = path.join(__dirname, '../../../core/test/fixtures/empty-dir');
-            await context.indexCodebase(otherPath);
-            snapshotManager.setCodebaseIndexed(otherPath, {
-                indexedFiles: 0,
-                totalChunks: 0,
-                status: 'completed'
-            });
-
-            const args = { path: fixturesPath };
-
-            // Act
-            const result = await handlers.handleClearIndex(args);
-
-            // Assert
-            expect(result.isError).toBe(true);
-            expect(result.content[0].text).toContain('not indexed');
-        });
-
-        it('should clear indexing codebase successfully', async () => {
-            // Arrange
-            snapshotManager.setCodebaseIndexing(fixturesPath, 50);
-            await context.indexCodebase(fixturesPath); // Create collection
-
-            const args = { path: fixturesPath };
-
-            // Act
-            const result = await handlers.handleClearIndex(args);
-
-            // Assert
-            expect(result.isError).not.toBe(true);
-            expect(result.content[0].text).toContain('Successfully cleared');
-        });
-
-        it('should report remaining codebases after clear', async () => {
-            // Arrange: Index two codebases
-            const secondPath = path.join(__dirname, '../../../core/test/fixtures/empty-dir');
-            await context.indexCodebase(fixturesPath);
-            await context.indexCodebase(secondPath);
-
-            snapshotManager.setCodebaseIndexed(fixturesPath, {
-                indexedFiles: 3,
-                totalChunks: 28,
-                status: 'completed'
-            });
-            snapshotManager.setCodebaseIndexed(secondPath, {
-                indexedFiles: 0,
-                totalChunks: 0,
-                status: 'completed'
-            });
-
-            const args = { path: fixturesPath };
-
-            // Act
-            const result = await handlers.handleClearIndex(args);
-
-            // Assert
-            expect(result.content[0].text).toContain('1 other indexed codebase');
-        });
-    });
-
-    describe('handleGetIndexingStatus', () => {
-        it('should return not_found status for non-indexed codebase', async () => {
-            // Arrange
-            const args = { path: fixturesPath };
-
-            // Act
-            const result = await handlers.handleGetIndexingStatus(args);
-
-            // Assert
-            expect(result.isError).not.toBe(true);
-            expect(result.content[0].text).toContain('not indexed');
-            expect(result.content[0].text).toContain('index_codebase');
-        });
-
-        it('should return indexing status with progress', async () => {
-            // Arrange
-            snapshotManager.setCodebaseIndexing(fixturesPath, 65.5);
-
-            const args = { path: fixturesPath };
-
-            // Act
-            const result = await handlers.handleGetIndexingStatus(args);
-
-            // Assert
-            expect(result.content[0].text).toContain('currently being indexed');
-            expect(result.content[0].text).toContain('65.5%');
-        });
-
-        it('should return indexed status with statistics', async () => {
-            // Arrange
-            snapshotManager.setCodebaseIndexed(fixturesPath, {
-                indexedFiles: 42,
-                totalChunks: 156,
-                status: 'completed'
-            });
-
-            const args = { path: fixturesPath };
-
-            // Act
-            const result = await handlers.handleGetIndexingStatus(args);
-
-            // Assert
-            expect(result.content[0].text).toContain('fully indexed');
-            expect(result.content[0].text).toContain('42 files');
-            expect(result.content[0].text).toContain('156 chunks');
-        });
-
-        it('should return failed status with error message', async () => {
-            // Arrange
-            snapshotManager.setCodebaseIndexFailed(
-                fixturesPath,
-                'Connection timeout',
-                75
-            );
-
-            const args = { path: fixturesPath };
-
-            // Act
-            const result = await handlers.handleGetIndexingStatus(args);
-
-            // Assert
-            expect(result.content[0].text).toContain('indexing failed');
-            expect(result.content[0].text).toContain('Connection timeout');
-            expect(result.content[0].text).toContain('75.0%');
-            expect(result.content[0].text).toContain('retry');
-        });
-
-        it('should handle non-existent path', async () => {
-            // Arrange
-            const nonExistentPath = '/path/that/does/not/exist';
-            const args = { path: nonExistentPath };
-
-            // Act
-            const result = await handlers.handleGetIndexingStatus(args);
-
-            // Assert
-            expect(result.isError).toBe(true);
-            expect(result.content[0].text).toContain('does not exist');
-        });
-    });
-
-    describe('Path Resolution', () => {
-        it('should handle absolute paths correctly', async () => {
-            // Arrange
-            const absolutePath = fixturesPath;
-            const args = { path: absolutePath, force: false, splitter: 'ast' };
-
-            // Act
-            const result = await handlers.handleIndexCodebase(args);
-
-            // Assert
-            expect(result.content[0].text).toContain(absolutePath);
-            expect(result.content[0].text).not.toContain('resolved to absolute path');
-        });
-
-        it('should resolve relative paths to absolute', async () => {
-            // Arrange: Use a relative path from MCP package root to core fixtures
-            // From /packages/mcp to /packages/core/test/fixtures/sample-codebase
-            const relativePath = '../core/test/fixtures/sample-codebase';
-            const args = { path: relativePath, force: false, splitter: 'ast' };
-
-            // Act
-            const result = await handlers.handleIndexCodebase(args);
-
-            // Assert
-            // Should successfully index and show resolution note
-            expect(result.isError).not.toBe(true);
-            expect(result.content[0].text).toContain('Started background indexing');
-            expect(result.content[0].text).toContain('resolved to absolute path');
-        });
-    });
-
-    describe('Error Handling', () => {
-        it('should handle file paths (not directories) gracefully', async () => {
-            // Arrange: Use a file path instead of directory
-            const filePath = path.join(fixturesPath, 'user-service.ts');
-            const args = { path: filePath, force: false, splitter: 'ast' };
-
-            // Act
-            const result = await handlers.handleIndexCodebase(args);
-
-            // Assert
-            expect(result.isError).toBe(true);
-            expect(result.content[0].text).toContain('not a directory');
-        });
-
-        it('should return proper error format for all tools', async () => {
-            // Test that errors have consistent format
-
-            // Arrange: Index something to avoid "no codebases" early return in clear_index
-            await context.indexCodebase(fixturesPath);
-            snapshotManager.setCodebaseIndexed(fixturesPath, {
-                indexedFiles: 3,
-                totalChunks: 28,
-                status: 'completed'
-            });
-
-            // Test index_codebase
-            const indexResult = await handlers.handleIndexCodebase({
-                path: '/nonexistent',
-                force: false,
-                splitter: 'ast'
-            });
-            expect(indexResult.isError).toBe(true);
-            expect(indexResult.content).toBeDefined();
-            expect(indexResult.content[0].type).toBe('text');
-
-            // Test search_code
-            const searchResult = await handlers.handleSearchCode({
-                path: '/nonexistent',
-                query: 'test',
-                limit: 10
-            });
-            expect(searchResult.isError).toBe(true);
-            expect(searchResult.content).toBeDefined();
-            expect(searchResult.content[0].type).toBe('text');
-
-            // Test clear_index
-            const clearResult = await handlers.handleClearIndex({
-                path: '/nonexistent'
-            });
-            expect(clearResult.isError).toBe(true);
-            expect(clearResult.content).toBeDefined();
-            expect(clearResult.content[0].type).toBe('text');
-
-            // Test get_indexing_status
-            const statusResult = await handlers.handleGetIndexingStatus({
-                path: '/nonexistent'
-            });
-            expect(statusResult.isError).toBe(true);
-            expect(statusResult.content).toBeDefined();
-            expect(statusResult.content[0].type).toBe('text');
-        });
-    });
-});
+describe('tool Handlers Integration', () => {
+  let handlers: ToolHandlers
+  let context: Context
+  let snapshotManager: FakeSnapshotManager
+  let fixturesPath: string
+
+  beforeEach(() => {
+    // Create test setup with fake dependencies
+    const setup = TestToolHandlerBuilder.createDefault()
+    handlers = setup.handlers
+    context = setup.context
+    snapshotManager = setup.snapshotManager
+
+    // Path to shared test fixtures from core package
+    fixturesPath = path.join(__dirname, '../../../core/test/fixtures/sample-codebase')
+  })
+
+  afterEach(() => {
+    // Reset all test doubles
+    snapshotManager.reset()
+  })
+
+  describe('handleIndexCodebase', () => {
+    it('should start indexing a valid codebase path', async () => {
+      // Arrange
+      const args = { path: fixturesPath, force: false, splitter: 'ast' }
+
+      // Act
+      const result = await handlers.handleIndexCodebase(args)
+
+      // Assert
+      expect(result.content).toBeDefined()
+      expect(result.content[0].type).toBe('text')
+      expect(result.content[0].text).toContain('Started background indexing')
+      expect(result.content[0].text).toContain(fixturesPath)
+
+      // Check snapshot manager state
+      const indexingCodebases = snapshotManager.getIndexingCodebases()
+      expect(indexingCodebases).toContain(fixturesPath)
+    })
+
+    it('should reject non-existent path', async () => {
+      // Arrange
+      const nonExistentPath = '/path/that/does/not/exist'
+      const args = { path: nonExistentPath, force: false, splitter: 'ast' }
+
+      // Act
+      const result = await handlers.handleIndexCodebase(args)
+
+      // Assert
+      expect(result.isError).toBe(true)
+      expect(result.content[0].text).toContain('does not exist')
+    })
+
+    it('should reject already indexed codebase without force flag', async () => {
+      // Arrange: Actually index the codebase first (creates collection in fake DB)
+      await context.indexCodebase(fixturesPath)
+
+      // Mark as indexed in snapshot
+      snapshotManager.setCodebaseIndexed(fixturesPath, {
+        indexedFiles: 3,
+        totalChunks: 10,
+        status: 'completed',
+      })
+
+      const args = { path: fixturesPath, force: false, splitter: 'ast' }
+
+      // Act
+      const result = await handlers.handleIndexCodebase(args)
+
+      // Assert
+      expect(result.isError).toBe(true)
+      expect(result.content[0].text).toContain('already indexed')
+      expect(result.content[0].text).toContain('force=true')
+    })
+
+    it('should allow re-indexing with force flag', async () => {
+      // Arrange: Actually index the codebase first
+      await context.indexCodebase(fixturesPath)
+
+      snapshotManager.setCodebaseIndexed(fixturesPath, {
+        indexedFiles: 3,
+        totalChunks: 10,
+        status: 'completed',
+      })
+
+      const args = { path: fixturesPath, force: true, splitter: 'ast' }
+
+      // Act
+      const result = await handlers.handleIndexCodebase(args)
+
+      // Assert
+      expect(result.isError).not.toBe(true)
+      expect(result.content[0].text).toContain('Started background indexing')
+    })
+
+    it('should reject codebase that is currently indexing', async () => {
+      // Arrange
+      snapshotManager.setCodebaseIndexing(fixturesPath, 50)
+
+      const args = { path: fixturesPath, force: false, splitter: 'ast' }
+
+      // Act
+      const result = await handlers.handleIndexCodebase(args)
+
+      // Assert
+      expect(result.isError).toBe(true)
+      expect(result.content[0].text).toContain('already being indexed')
+    })
+
+    it('should handle custom extensions parameter', async () => {
+      // Arrange
+      const args = {
+        path: fixturesPath,
+        force: false,
+        splitter: 'ast',
+        customExtensions: ['.vue', '.svelte'],
+      }
+
+      // Act
+      const result = await handlers.handleIndexCodebase(args)
+
+      // Assert
+      expect(result.content[0].text).toContain('Started background indexing')
+      expect(result.content[0].text).toContain('custom extensions')
+    })
+
+    it('should handle custom ignore patterns parameter', async () => {
+      // Arrange
+      const args = {
+        path: fixturesPath,
+        force: false,
+        splitter: 'ast',
+        ignorePatterns: ['static/**', '*.tmp'],
+      }
+
+      // Act
+      const result = await handlers.handleIndexCodebase(args)
+
+      // Assert
+      expect(result.content[0].text).toContain('Started background indexing')
+      expect(result.content[0].text).toContain('custom ignore patterns')
+    })
+
+    it('should reject invalid splitter type', async () => {
+      // Arrange
+      const args = { path: fixturesPath, force: false, splitter: 'invalid' }
+
+      // Act
+      const result = await handlers.handleIndexCodebase(args)
+
+      // Assert
+      expect(result.isError).toBe(true)
+      expect(result.content[0].text).toContain('Invalid splitter type')
+    })
+  })
+
+  describe('handleSearchCode', () => {
+    it('should return error for non-indexed codebase', async () => {
+      // Arrange
+      const args = { path: fixturesPath, query: 'test query', limit: 10 }
+
+      // Act
+      const result = await handlers.handleSearchCode(args)
+
+      // Assert
+      expect(result.isError).toBe(true)
+      expect(result.content[0].text).toContain('not indexed')
+      expect(result.content[0].text).toContain('index_codebase')
+    })
+
+    it('should return error for non-existent path', async () => {
+      // Arrange
+      const nonExistentPath = '/path/that/does/not/exist'
+      const args = { path: nonExistentPath, query: 'test', limit: 10 }
+
+      // Act
+      const result = await handlers.handleSearchCode(args)
+
+      // Assert
+      expect(result.isError).toBe(true)
+      expect(result.content[0].text).toContain('does not exist')
+    })
+
+    it('should allow search on indexing codebase with warning', async () => {
+      // Arrange: Set codebase as indexing
+      snapshotManager.setCodebaseIndexing(fixturesPath, 50)
+
+      // Index the codebase first (simulate background indexing started)
+      await context.indexCodebase(fixturesPath)
+
+      const args = { path: fixturesPath, query: 'user', limit: 5 }
+
+      // Act
+      const result = await handlers.handleSearchCode(args)
+
+      // Assert
+      expect(result.isError).not.toBe(true)
+      expect(result.content[0].text).toContain('Indexing in Progress')
+    })
+
+    it('should return search results for indexed codebase', async () => {
+      // Arrange: Index and mark as indexed
+      await context.indexCodebase(fixturesPath)
+      snapshotManager.setCodebaseIndexed(fixturesPath, {
+        indexedFiles: 3,
+        totalChunks: 28,
+        status: 'completed',
+      })
+
+      const args = { path: fixturesPath, query: 'user service', limit: 5 }
+
+      // Act
+      const result = await handlers.handleSearchCode(args)
+
+      // Assert
+      expect(result.isError).not.toBe(true)
+      expect(result.content[0].text).toContain('Found')
+      expect(result.content[0].text).toContain('results')
+    })
+
+    it('should handle no results gracefully', async () => {
+      // Arrange
+      await context.indexCodebase(fixturesPath)
+      snapshotManager.setCodebaseIndexed(fixturesPath, {
+        indexedFiles: 3,
+        totalChunks: 28,
+        status: 'completed',
+      })
+
+      const args = { path: fixturesPath, query: 'xyznonexistent999', limit: 5 }
+
+      // Act
+      const result = await handlers.handleSearchCode(args)
+
+      // Assert
+      expect(result.isError).not.toBe(true)
+      // Note: Fake embeddings may still find results due to deterministic hashing
+      // The important thing is it doesn't error
+      expect(result.content[0].text).toBeDefined()
+    })
+
+    it('should respect limit parameter', async () => {
+      // Arrange
+      await context.indexCodebase(fixturesPath)
+      snapshotManager.setCodebaseIndexed(fixturesPath, {
+        indexedFiles: 3,
+        totalChunks: 28,
+        status: 'completed',
+      })
+
+      const args = { path: fixturesPath, query: 'function', limit: 3 }
+
+      // Act
+      const result = await handlers.handleSearchCode(args)
+
+      // Assert
+      expect(result.isError).not.toBe(true)
+      // Should not return more than requested limit
+      const resultCount = (result.content[0].text.match(/\d+\. Code snippet/g) || []).length
+      expect(resultCount).toBeLessThanOrEqual(3)
+    })
+
+    it('should handle extensionFilter parameter', async () => {
+      // Arrange
+      await context.indexCodebase(fixturesPath)
+      snapshotManager.setCodebaseIndexed(fixturesPath, {
+        indexedFiles: 3,
+        totalChunks: 28,
+        status: 'completed',
+      })
+
+      const args = {
+        path: fixturesPath,
+        query: 'function',
+        limit: 10,
+        extensionFilter: ['.ts'],
+      }
+
+      // Act
+      const result = await handlers.handleSearchCode(args)
+
+      // Assert
+      expect(result.isError).not.toBe(true)
+      // Results should only contain .ts files
+      if (result.content[0].text.includes('Code snippet')) {
+        expect(result.content[0].text).not.toContain('.py')
+      }
+    })
+
+    it('should reject invalid extension filter format', async () => {
+      // Arrange
+      await context.indexCodebase(fixturesPath)
+      snapshotManager.setCodebaseIndexed(fixturesPath, {
+        indexedFiles: 3,
+        totalChunks: 28,
+        status: 'completed',
+      })
+
+      const args = {
+        path: fixturesPath,
+        query: 'function',
+        limit: 10,
+        extensionFilter: ['invalid'], // Missing dot prefix
+      }
+
+      // Act
+      const result = await handlers.handleSearchCode(args)
+
+      // Assert
+      expect(result.isError).toBe(true)
+      expect(result.content[0].text).toContain('Invalid file extensions')
+    })
+
+    it('should auto-sync and allow search when collection exists but snapshot is missing (issue #37)', async () => {
+      // Regression test for https://github.com/chatbot-pf/context-please/issues/37
+      // Scenario: Collection exists in vector DB, but snapshot file is out of sync
+      // Expected: Should auto-recover by syncing state and allowing search
+
+      // Arrange: Index codebase (creates collection in vector DB)
+      await context.indexCodebase(fixturesPath)
+
+      // Simulate out-of-sync state: Collection exists, but snapshot thinks it's not indexed
+      // This can happen if snapshot file was deleted or corrupted
+      snapshotManager.reset() // Clear snapshot to simulate out-of-sync state (e.g., after file deletion or corruption)
+
+      // Verify precondition: snapshot doesn't know about the codebase
+      expect(snapshotManager.getIndexedCodebases()).not.toContain(fixturesPath)
+
+      // Verify precondition: collection still exists in vector DB
+      const hasCollection = await context.hasIndex(fixturesPath)
+      expect(hasCollection).toBe(true)
+
+      const args = { path: fixturesPath, query: 'user service', limit: 5 }
+
+      // Act: Search should auto-detect collection and sync state
+      const result = await handlers.handleSearchCode(args)
+
+      // Assert: Should succeed (not return "not indexed" error)
+      expect(result.isError).not.toBe(true)
+      expect(result.content[0].text).not.toContain('not indexed')
+      expect(result.content[0].text).toContain('Found')
+
+      // Verify: Snapshot was automatically synced with actual stats from vector DB
+      expect(snapshotManager.getIndexedCodebases()).toContain(fixturesPath)
+      const info = snapshotManager.getCodebaseInfo(fixturesPath)
+      expect(info?.status).toBe('indexed')
+      if (info?.status === 'indexed') {
+        // Stats should be retrieved from vector DB (non-zero values)
+        // Not testing exact values to avoid brittleness with fixture changes
+        expect(info.indexedFiles).toBeGreaterThan(0)
+        expect(info.totalChunks).toBeGreaterThan(0)
+
+        // Verify stats match actual collection
+        const actualStats = await context.getCollectionStats(fixturesPath)
+        expect(actualStats).not.toBeNull()
+        expect(info.indexedFiles).toBe(actualStats!.indexedFiles)
+        expect(info.totalChunks).toBe(actualStats!.totalChunks)
+      }
+    })
+
+    it('should return error when stats retrieval returns null during recovery', async () => {
+      // Arrange: Index codebase (creates collection in vector DB)
+      await context.indexCodebase(fixturesPath)
+
+      // Mock getCollectionStats to return null (simulating collection not loaded)
+      vi.spyOn(context, 'getCollectionStats').mockResolvedValue(null)
+
+      // Clear snapshot to trigger recovery
+      snapshotManager.reset()
+
+      // Verify collection exists
+      expect(await context.hasIndex(fixturesPath)).toBe(true)
+
+      const args = { path: fixturesPath, query: 'user service', limit: 5 }
+
+      // Act: Search triggers recovery with failing stats retrieval
+      const result = await handlers.handleSearchCode(args)
+
+      // Assert: Should return error instead of using placeholder values
+      expect(result.isError).toBe(true)
+      expect(result.content[0].text).toContain('statistics could not be retrieved')
+      expect(result.content[0].text).toContain('Collection is not loaded')
+
+      // Snapshot should NOT be synced with placeholder values
+      expect(snapshotManager.getIndexedCodebases()).not.toContain(fixturesPath)
+    })
+
+    it('should return error when stats retrieval throws unexpected error', async () => {
+      // Arrange: Index codebase
+      await context.indexCodebase(fixturesPath)
+
+      // Mock getCollectionStats to throw (simulating network failure)
+      const networkError = new Error('Network timeout connecting to Milvus')
+      vi.spyOn(context, 'getCollectionStats').mockRejectedValue(networkError)
+
+      // Clear snapshot to trigger recovery
+      snapshotManager.reset()
+
+      const args = { path: fixturesPath, query: 'test', limit: 5 }
+
+      // Act: Search triggers recovery with throwing stats retrieval
+      const result = await handlers.handleSearchCode(args)
+
+      // Assert: Should return detailed error message
+      expect(result.isError).toBe(true)
+      expect(result.content[0].text).toContain('Failed to sync codebase')
+      expect(result.content[0].text).toContain('Network timeout')
+      expect(result.content[0].text).toContain('Network connectivity issues')
+
+      // Snapshot should NOT be synced
+      expect(snapshotManager.getIndexedCodebases()).not.toContain(fixturesPath)
+    })
+  })
+
+  describe('handleClearIndex', () => {
+    it('should clear indexed codebase successfully', async () => {
+      // Arrange
+      await context.indexCodebase(fixturesPath)
+      snapshotManager.setCodebaseIndexed(fixturesPath, {
+        indexedFiles: 3,
+        totalChunks: 28,
+        status: 'completed',
+      })
+
+      const args = { path: fixturesPath }
+
+      // Act
+      const result = await handlers.handleClearIndex(args)
+
+      // Assert
+      expect(result.isError).not.toBe(true)
+      expect(result.content[0].text).toContain('Successfully cleared')
+
+      // Verify codebase was removed from snapshot
+      const indexedCodebases = snapshotManager.getIndexedCodebases()
+      expect(indexedCodebases).not.toContain(fixturesPath)
+    })
+
+    it('should handle clearing non-existent path', async () => {
+      // Arrange: First index something so we bypass the "no codebases" early return
+      await context.indexCodebase(path.join(__dirname, '../../../core/test/fixtures/empty-dir'))
+      snapshotManager.setCodebaseIndexed(path.join(__dirname, '../../../core/test/fixtures/empty-dir'), {
+        indexedFiles: 0,
+        totalChunks: 0,
+        status: 'completed',
+      })
+
+      const nonExistentPath = '/path/that/does/not/exist'
+      const args = { path: nonExistentPath }
+
+      // Act
+      const result = await handlers.handleClearIndex(args)
+
+      // Assert
+      expect(result.isError).toBe(true)
+      expect(result.content[0].text).toContain('does not exist')
+    })
+
+    it('should handle clearing non-indexed codebase', async () => {
+      // Arrange: Index a different codebase so we bypass "no codebases" early return
+      const otherPath = path.join(__dirname, '../../../core/test/fixtures/empty-dir')
+      await context.indexCodebase(otherPath)
+      snapshotManager.setCodebaseIndexed(otherPath, {
+        indexedFiles: 0,
+        totalChunks: 0,
+        status: 'completed',
+      })
+
+      const args = { path: fixturesPath }
+
+      // Act
+      const result = await handlers.handleClearIndex(args)
+
+      // Assert
+      expect(result.isError).toBe(true)
+      expect(result.content[0].text).toContain('not indexed')
+    })
+
+    it('should clear indexing codebase successfully', async () => {
+      // Arrange
+      snapshotManager.setCodebaseIndexing(fixturesPath, 50)
+      await context.indexCodebase(fixturesPath) // Create collection
+
+      const args = { path: fixturesPath }
+
+      // Act
+      const result = await handlers.handleClearIndex(args)
+
+      // Assert
+      expect(result.isError).not.toBe(true)
+      expect(result.content[0].text).toContain('Successfully cleared')
+    })
+
+    it('should report remaining codebases after clear', async () => {
+      // Arrange: Index two codebases
+      const secondPath = path.join(__dirname, '../../../core/test/fixtures/empty-dir')
+      await context.indexCodebase(fixturesPath)
+      await context.indexCodebase(secondPath)
+
+      snapshotManager.setCodebaseIndexed(fixturesPath, {
+        indexedFiles: 3,
+        totalChunks: 28,
+        status: 'completed',
+      })
+      snapshotManager.setCodebaseIndexed(secondPath, {
+        indexedFiles: 0,
+        totalChunks: 0,
+        status: 'completed',
+      })
+
+      const args = { path: fixturesPath }
+
+      // Act
+      const result = await handlers.handleClearIndex(args)
+
+      // Assert
+      expect(result.content[0].text).toContain('1 other indexed codebase')
+    })
+  })
+
+  describe('handleGetIndexingStatus', () => {
+    it('should return not_found status for non-indexed codebase', async () => {
+      // Arrange
+      const args = { path: fixturesPath }
+
+      // Act
+      const result = await handlers.handleGetIndexingStatus(args)
+
+      // Assert
+      expect(result.isError).not.toBe(true)
+      expect(result.content[0].text).toContain('not indexed')
+      expect(result.content[0].text).toContain('index_codebase')
+    })
+
+    it('should return indexing status with progress', async () => {
+      // Arrange
+      snapshotManager.setCodebaseIndexing(fixturesPath, 65.5)
+
+      const args = { path: fixturesPath }
+
+      // Act
+      const result = await handlers.handleGetIndexingStatus(args)
+
+      // Assert
+      expect(result.content[0].text).toContain('currently being indexed')
+      expect(result.content[0].text).toContain('65.5%')
+    })
+
+    it('should return indexed status with statistics', async () => {
+      // Arrange
+      snapshotManager.setCodebaseIndexed(fixturesPath, {
+        indexedFiles: 42,
+        totalChunks: 156,
+        status: 'completed',
+      })
+
+      const args = { path: fixturesPath }
+
+      // Act
+      const result = await handlers.handleGetIndexingStatus(args)
+
+      // Assert
+      expect(result.content[0].text).toContain('fully indexed')
+      expect(result.content[0].text).toContain('42 files')
+      expect(result.content[0].text).toContain('156 chunks')
+    })
+
+    it('should return failed status with error message', async () => {
+      // Arrange
+      snapshotManager.setCodebaseIndexFailed(
+        fixturesPath,
+        'Connection timeout',
+        75,
+      )
+
+      const args = { path: fixturesPath }
+
+      // Act
+      const result = await handlers.handleGetIndexingStatus(args)
+
+      // Assert
+      expect(result.content[0].text).toContain('indexing failed')
+      expect(result.content[0].text).toContain('Connection timeout')
+      expect(result.content[0].text).toContain('75.0%')
+      expect(result.content[0].text).toContain('retry')
+    })
+
+    it('should handle non-existent path', async () => {
+      // Arrange
+      const nonExistentPath = '/path/that/does/not/exist'
+      const args = { path: nonExistentPath }
+
+      // Act
+      const result = await handlers.handleGetIndexingStatus(args)
+
+      // Assert
+      expect(result.isError).toBe(true)
+      expect(result.content[0].text).toContain('does not exist')
+    })
+  })
+
+  describe('path Resolution', () => {
+    it('should handle absolute paths correctly', async () => {
+      // Arrange
+      const absolutePath = fixturesPath
+      const args = { path: absolutePath, force: false, splitter: 'ast' }
+
+      // Act
+      const result = await handlers.handleIndexCodebase(args)
+
+      // Assert
+      expect(result.content[0].text).toContain(absolutePath)
+      expect(result.content[0].text).not.toContain('resolved to absolute path')
+    })
+
+    it('should resolve relative paths to absolute', async () => {
+      // Arrange: Use a relative path from MCP package root to core fixtures
+      // From /packages/mcp to /packages/core/test/fixtures/sample-codebase
+      const relativePath = '../core/test/fixtures/sample-codebase'
+      const args = { path: relativePath, force: false, splitter: 'ast' }
+
+      // Act
+      const result = await handlers.handleIndexCodebase(args)
+
+      // Assert
+      // Should successfully index and show resolution note
+      expect(result.isError).not.toBe(true)
+      expect(result.content[0].text).toContain('Started background indexing')
+      expect(result.content[0].text).toContain('resolved to absolute path')
+    })
+  })
+
+  describe('error Handling', () => {
+    it('should handle file paths (not directories) gracefully', async () => {
+      // Arrange: Use a file path instead of directory
+      const filePath = path.join(fixturesPath, 'user-service.ts')
+      const args = { path: filePath, force: false, splitter: 'ast' }
+
+      // Act
+      const result = await handlers.handleIndexCodebase(args)
+
+      // Assert
+      expect(result.isError).toBe(true)
+      expect(result.content[0].text).toContain('not a directory')
+    })
+
+    it('should return proper error format for all tools', async () => {
+      // Test that errors have consistent format
+
+      // Arrange: Index something to avoid "no codebases" early return in clear_index
+      await context.indexCodebase(fixturesPath)
+      snapshotManager.setCodebaseIndexed(fixturesPath, {
+        indexedFiles: 3,
+        totalChunks: 28,
+        status: 'completed',
+      })
+
+      // Test index_codebase
+      const indexResult = await handlers.handleIndexCodebase({
+        path: '/nonexistent',
+        force: false,
+        splitter: 'ast',
+      })
+      expect(indexResult.isError).toBe(true)
+      expect(indexResult.content).toBeDefined()
+      expect(indexResult.content[0].type).toBe('text')
+
+      // Test search_code
+      const searchResult = await handlers.handleSearchCode({
+        path: '/nonexistent',
+        query: 'test',
+        limit: 10,
+      })
+      expect(searchResult.isError).toBe(true)
+      expect(searchResult.content).toBeDefined()
+      expect(searchResult.content[0].type).toBe('text')
+
+      // Test clear_index
+      const clearResult = await handlers.handleClearIndex({
+        path: '/nonexistent',
+      })
+      expect(clearResult.isError).toBe(true)
+      expect(clearResult.content).toBeDefined()
+      expect(clearResult.content[0].type).toBe('text')
+
+      // Test get_indexing_status
+      const statusResult = await handlers.handleGetIndexingStatus({
+        path: '/nonexistent',
+      })
+      expect(statusResult.isError).toBe(true)
+      expect(statusResult.content).toBeDefined()
+      expect(statusResult.content[0].type).toBe('text')
+    })
+  })
+})

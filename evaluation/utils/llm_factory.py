@@ -1,6 +1,7 @@
 from langchain_openai import ChatOpenAI
 from langchain_ollama import ChatOllama
 from langchain_anthropic import ChatAnthropic
+from langchain_google_genai import ChatGoogleGenerativeAI
 import os
 
 
@@ -17,5 +18,10 @@ def llm_factory(llm_type: str, llm_model: str):
         )
     elif llm_type == "anthropic":
         return ChatAnthropic(model=llm_model, api_key=os.getenv("ANTHROPIC_API_KEY"))
+    elif llm_type == "google":
+        return ChatGoogleGenerativeAI(
+            model=llm_model,
+            google_api_key=os.getenv("GOOGLE_API_KEY"),
+        )
     else:
         raise ValueError(f"Unsupported LLM type: {llm_type}")
