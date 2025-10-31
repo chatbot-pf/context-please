@@ -16,7 +16,7 @@ export interface ContextMcpConfig {
   ollamaModel?: string
   ollamaHost?: string
   // Vector database configuration
-  vectorDbType?: 'milvus' | 'qdrant' // Vector database type (default: milvus)
+  vectorDbType?: 'milvus' | 'qdrant' | 'faiss' | 'faiss-local' // Vector database type (default: faiss for local, milvus for remote)
   milvusAddress?: string // Optional, can be auto-resolved from token
   milvusToken?: string
   qdrantUrl?: string // Qdrant URL (e.g., http://localhost:6333 or cloud URL)
