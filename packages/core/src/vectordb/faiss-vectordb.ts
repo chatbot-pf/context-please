@@ -66,7 +66,6 @@ interface DocumentMetadata {
  *       └── metadata.json      # Document metadata
  */
 export class FaissVectorDatabase extends BaseVectorDatabase<FaissConfig> {
-  private storageDir: string
   private collections: Map<string, {
     index: IndexFlatL2
     metadata: CollectionMetadata
@@ -75,8 +74,19 @@ export class FaissVectorDatabase extends BaseVectorDatabase<FaissConfig> {
   }> = new Map()
 
   constructor(config: FaissConfig) {
-    super(config)
-    this.storageDir = config.storageDir || path.join(os.homedir(), '.context', 'faiss-indexes')
+    // Set storageDir default before calling super(), which triggers initialize()
+    const configWithDefaults: FaissConfig = {
+      ...config,
+      storageDir: config.storageDir || path.join(os.homedir(), '.context', 'faiss-indexes'),
+    }
+    super(configWithDefaults)
+  }
+
+  /**
+   * Get storage directory (lazily computed from config)
+   */
+  private get storageDir(): string {
+    return this.config.storageDir!
   }
 
   /**
@@ -437,6 +447,17 @@ export class FaissVectorDatabase extends BaseVectorDatabase<FaissConfig> {
 
     console.log('[FaissDB] 📝 Inserting documents:', documents.length)
 
+    // Validate vector dimensions
+    const expectedDim = collection.metadata.dimension
+    for (const doc of documents) {
+      if (doc.vector.length !== expectedDim) {
+        throw new Error(
+          `Vector dimension mismatch for document '${doc.id}': `
+          + `expected ${expectedDim}, got ${doc.vector.length}`,
+        )
+      }
+    }
+
     // Add vectors to FAISS index one at a time
     documents.forEach((doc) => {
       collection.index.add(doc.vector)
@@ -480,6 +501,17 @@ export class FaissVectorDatabase extends BaseVectorDatabase<FaissConfig> {
 
     console.log('[FaissDB] 📝 Inserting hybrid documents:', documents.length)
 
+    // Validate vector dimensions
+    const expectedDim = collection.metadata.dimension
+    for (const doc of documents) {
+      if (doc.vector.length !== expectedDim) {
+        throw new Error(
+          `Vector dimension mismatch for document '${doc.id}': `
+          + `expected ${expectedDim}, got ${doc.vector.length}`,
+        )
+      }
+    }
+
     // Train BM25 on all documents (including new ones)
     const allDocuments = [...collection.documents.values(), ...documents]
     const allContents = allDocuments.map((doc) => doc.content)
@@ -522,9 +554,17 @@ export class FaissVectorDatabase extends BaseVectorDatabase<FaissConfig> {
       throw new Error(`Collection ${collectionName} not found`)
     }
 
-    const topK = options?.topK || 10
+    // FAISS requires topK <= ntotal (number of vectors in index)
+    const ntotal = collection.index.ntotal()
+    if (ntotal === 0) {
+      console.log('[FaissDB] 🔍 Empty collection, returning no results')
+      return []
+    }
 
-    console.log('[FaissDB] 🔍 Searching vectors, topK:', topK)
+    const requestedTopK = options?.topK || 10
+    const topK = Math.min(requestedTopK, ntotal)
+
+    console.log('[FaissDB] 🔍 Searching vectors, topK:', topK, '(requested:', requestedTopK, ', ntotal:', ntotal, ')')
 
     // Search FAISS index
     const results = collection.index.search(queryVector, topK)
@@ -593,6 +633,9 @@ export class FaissVectorDatabase extends BaseVectorDatabase<FaissConfig> {
 
     console.log('[FaissDB] 🔍 Hybrid search, requests:', searchRequests.length)
 
+    // FAISS requires topK <= ntotal
+    const ntotal = collection.index.ntotal()
+
     // Separate dense and sparse search requests
     const denseResults: Map<string, number> = new Map()
     const sparseResults: Map<string, number> = new Map()
@@ -600,8 +643,13 @@ export class FaissVectorDatabase extends BaseVectorDatabase<FaissConfig> {
     for (const request of searchRequests) {
       if (request.anns_field === 'vector' || request.anns_field === 'dense') {
         // Dense search
+        if (ntotal === 0) {
+          continue // Skip dense search on empty index
+        }
+
         const queryVector = request.data as number[]
-        const results = collection.index.search(queryVector, limit * 2)
+        const topK = Math.min(limit * 2, ntotal)
+        const results = collection.index.search(queryVector, topK)
 
         const documentsArray = Array.from(collection.documents.values())
         for (let i = 0; i < results.labels.length; i++) {

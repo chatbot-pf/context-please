@@ -26,7 +26,8 @@ describe('faissVectorDatabase', () => {
 
     it('should throw error with invalid storage directory permissions', async () => {
       const readOnlyDb = new FaissVectorDatabase({ storageDir: '/root/faiss-test-readonly' })
-      await expect((readOnlyDb as any).initialize()).rejects.toThrow(/Failed to initialize/)
+      // Initialize is called in constructor, so we need to wait for it to reject
+      await expect((readOnlyDb as any).initializationPromise).rejects.toThrow(/Failed to initialize/)
     })
   })
 
