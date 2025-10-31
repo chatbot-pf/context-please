@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.1](https://github.com/chatbot-pf/context-please/compare/mcp-v0.3.0...mcp-v0.3.1) (2025-10-30)
+
+
+### Bug Fixes
+
+* **mcp:** resolve search_code failure when snapshot is out of sync ([#38](https://github.com/chatbot-pf/context-please/issues/38)) ([27de02c](https://github.com/chatbot-pf/context-please/commit/27de02ce6bf8dcf5ff06fe2931019a26fe689524))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @pleaseai/context-please-core bumped to 0.3.1
+
 ## [0.3.0](https://github.com/chatbot-pf/context-please/compare/mcp-v0.2.1...mcp-v0.3.0) (2025-10-18)
 
 
