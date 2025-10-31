@@ -116,8 +116,10 @@ export class GeminiEmbedding extends Embedding {
           catch (error) {
             // If error is not retryable, throw a special error to stop retries
             if (!this.isRetryableError(error)) {
-              // Wrap in a non-retryable marker
-              const nonRetryableError = new Error(`${context}: ${error instanceof Error ? error.message : 'Unknown error'}`)
+              // Wrap in a non-retryable marker while preserving original error
+              const nonRetryableError = new Error(`${context}: ${error instanceof Error ? error.message : 'Unknown error'}`, {
+                cause: error,
+              })
               ;(nonRetryableError as any).__nonRetryable = true
               throw nonRetryableError
             }
@@ -202,19 +204,26 @@ export class GeminiEmbedding extends Embedding {
     }
     catch (batchError) {
       // Fallback: Process individually if batch fails after all retries
-      // This handles cases where batch processing is temporarily unavailable
-      // or when individual requests are more reliable
+      // Add delay between requests to avoid rate limiting
       const results: EmbeddingVector[] = []
+      const FALLBACK_DELAY_MS = 100 // Delay between individual requests
 
-      for (const text of processedTexts) {
+      for (let i = 0; i < processedTexts.length; i++) {
+        const text = processedTexts[i]
         try {
+          // Add delay between requests (except for first)
+          if (i > 0) {
+            await new Promise(resolve => setTimeout(resolve, FALLBACK_DELAY_MS))
+          }
+
           const result = await this.embed(text)
           results.push(result)
         }
         catch (individualError) {
           // If individual request also fails, re-throw the error with cause
-          const error = new Error('Gemini batch embedding failed (both batch and individual attempts failed)')
-          ;(error as any).cause = individualError
+          const error = new Error('Gemini batch embedding failed (both batch and individual attempts failed)', {
+            cause: individualError,
+          })
           throw error
         }
       }
