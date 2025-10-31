@@ -59,6 +59,12 @@ describe('vectorDatabaseFactory', () => {
     })
 
     it('should create FaissVectorDatabase with FAISS_LOCAL type', () => {
+      // Skip if FAISS bindings not available
+      if (!VectorDatabaseFactory.isFaissAvailable()) {
+        console.log('⏭️  Skipping FAISS test (native bindings not available)')
+        return
+      }
+
       const db = VectorDatabaseFactory.create(
         VectorDatabaseType.FAISS_LOCAL,
         {
