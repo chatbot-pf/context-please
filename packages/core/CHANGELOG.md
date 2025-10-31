@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/chatbot-pf/context-please/compare/core-v0.3.1...core-v0.4.0) (2025-10-31)
+
+
+### Features
+
+* **core:** Add comprehensive retry mechanism and batch fallback for Gemini embeddings ([#44](https://github.com/chatbot-pf/context-please/issues/44)) ([6b4657d](https://github.com/chatbot-pf/context-please/commit/6b4657d1a522f953de6fde6cfd2cce529e675ba0))
+
 ## [0.3.1](https://github.com/chatbot-pf/context-please/compare/core-v0.3.0...core-v0.3.1) (2025-10-30)
 
 
