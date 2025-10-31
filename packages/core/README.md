@@ -238,6 +238,45 @@ const context = new Context({
 })
 ```
 
+### Using Gemini Embeddings with Retry Configuration
+
+```typescript
+import { Context, MilvusVectorDatabase, GeminiEmbedding } from '@pleaseai/context-please-core'
+
+// Initialize with Gemini embedding provider
+const embedding = new GeminiEmbedding({
+  apiKey: process.env.GEMINI_API_KEY || 'your-gemini-api-key',
+  model: 'gemini-embedding-001',
+  outputDimensionality: 768, // Optional: Matryoshka Representation Learning support (256, 768, 1536, 3072)
+  maxRetries: 3, // Optional: Maximum retry attempts (default: 3)
+  baseDelay: 1000 // Optional: Base delay in ms for exponential backoff (default: 1000ms)
+})
+
+const vectorDatabase = new MilvusVectorDatabase({
+  address: process.env.MILVUS_ADDRESS || 'localhost:19530',
+  token: process.env.MILVUS_TOKEN || ''
+})
+
+const context = new Context({
+  embedding,
+  vectorDatabase
+})
+
+// The retry mechanism automatically handles:
+// - Rate limit errors (429)
+// - Server errors (500, 502, 503, 504)
+// - Network errors (ECONNREFUSED, ETIMEDOUT, ENOTFOUND, EAI_AGAIN)
+// - Transient API failures with exponential backoff (1s → 2s → 4s → 8s, capped at 10s)
+
+// Update retry configuration at runtime
+embedding.setMaxRetries(5)
+embedding.setBaseDelay(2000)
+
+// Check current retry configuration
+const retryConfig = embedding.getRetryConfig()
+console.log(`Max retries: ${retryConfig.maxRetries}, Base delay: ${retryConfig.baseDelay}ms`)
+```
+
 ### Custom File Filtering
 
 ```typescript

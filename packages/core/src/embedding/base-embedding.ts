@@ -16,6 +16,11 @@ export abstract class Embedding {
    * @returns Processed text
    */
   protected preprocessText(text: string): string {
+    // Handle null/undefined by converting to single space
+    if (text == null) {
+      return ' '
+    }
+
     // Replace empty string with single space
     if (text === '') {
       return ' '
