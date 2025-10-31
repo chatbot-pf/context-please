@@ -3,10 +3,46 @@ import type { MilvusRestfulConfig } from './milvus-restful-vectordb'
 import type { MilvusConfig } from './milvus-vectordb'
 import type { QdrantConfig } from './qdrant-vectordb'
 import type { VectorDatabase } from './types'
-import { FaissVectorDatabase } from './faiss-vectordb'
 import { MilvusRestfulVectorDatabase } from './milvus-restful-vectordb'
 import { MilvusVectorDatabase } from './milvus-vectordb'
 import { QdrantVectorDatabase } from './qdrant-vectordb'
+
+// FAISS is optional - may not be available in all environments (e.g., CI without native bindings)
+// Use lazy loading to avoid import errors
+let FaissVectorDatabase: any
+let faissAvailable: boolean | null = null // null = not checked yet
+let faissCheckError: string | null = null
+
+function checkFaissAvailability(): boolean {
+  if (faissAvailable !== null) {
+    return faissAvailable
+  }
+
+  try {
+    FaissVectorDatabase = require('./faiss-vectordb').FaissVectorDatabase
+    faissAvailable = true
+    return true
+  }
+  catch (error: any) {
+    const errorMsg = error.message || String(error)
+
+    // Check if it's a FAISS bindings error (allow FAISS to be unavailable)
+    if (errorMsg.includes('Could not locate the bindings file')
+        || errorMsg.includes('faiss-node')) {
+      faissAvailable = false
+      faissCheckError = 'FAISS native bindings not available'
+      console.warn('[VectorDatabaseFactory] FAISS native bindings not available. FAISS support disabled.')
+      return false
+    }
+
+    // For other errors (e.g., missing file during tests), also mark as unavailable
+    // but don't throw to allow tests to run
+    faissAvailable = false
+    faissCheckError = errorMsg
+    console.warn(`[VectorDatabaseFactory] FAISS unavailable: ${errorMsg}`)
+    return false
+  }
+}
 
 /**
  * Supported vector database types
@@ -110,6 +146,13 @@ export class VectorDatabaseFactory {
         return new QdrantVectorDatabase(config as QdrantConfig)
 
       case VectorDatabaseType.FAISS_LOCAL:
+        if (!checkFaissAvailability()) {
+          throw new Error(
+            `FAISS vector database is not available. ${faissCheckError || 'Native bindings could not be loaded'}. `
+            + 'This usually happens in environments without C++ build tools. '
+            + 'Please use another vector database type (MILVUS_GRPC, MILVUS_RESTFUL, or QDRANT_GRPC).',
+          )
+        }
         return new FaissVectorDatabase(config as FaissConfig)
 
       default:
@@ -119,8 +162,20 @@ export class VectorDatabaseFactory {
 
   /**
    * Get all supported database types
+   * Note: FAISS may not be available if native bindings are missing
    */
   static getSupportedTypes(): VectorDatabaseType[] {
-    return Object.values(VectorDatabaseType)
+    const types = Object.values(VectorDatabaseType)
+    if (!checkFaissAvailability()) {
+      return types.filter(t => t !== VectorDatabaseType.FAISS_LOCAL)
+    }
+    return types
+  }
+
+  /**
+   * Check if FAISS is available in the current environment
+   */
+  static isFaissAvailable(): boolean {
+    return checkFaissAvailability()
   }
 }
