@@ -64,21 +64,27 @@ export class GeminiEmbedding extends Embedding {
    * @param error Error object to check
    * @returns True if error is retryable
    */
-  private isRetryableError(error: any): boolean {
+  private isRetryableError(error: unknown): boolean {
+    if (typeof error !== 'object' || error === null) {
+      return false
+    }
+
     // Network errors
     const networkErrorCodes = ['ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_AGAIN']
-    if (error.code && networkErrorCodes.includes(error.code)) {
+    if ('code' in error && typeof error.code === 'string' && networkErrorCodes.includes(error.code)) {
       return true
     }
 
     // HTTP status codes
     const retryableStatusCodes = [429, 500, 502, 503, 504]
-    if (error.status && retryableStatusCodes.includes(error.status)) {
+    if ('status' in error && typeof error.status === 'number' && retryableStatusCodes.includes(error.status)) {
       return true
     }
 
     // Error message patterns
-    const errorMessage = error.message?.toLowerCase() || ''
+    const errorMessage = ('message' in error && typeof error.message === 'string')
+      ? error.message.toLowerCase()
+      : ''
     const retryablePatterns = [
       'rate limit',
       'quota exceeded',
@@ -101,29 +107,37 @@ export class GeminiEmbedding extends Embedding {
     operation: () => Promise<T>,
     context: string,
   ): Promise<T> {
-    // First attempt - check if error is retryable
     try {
-      return await operation()
+      return await retry(
+        async () => {
+          try {
+            return await operation()
+          }
+          catch (error) {
+            // If error is not retryable, throw a special error to stop retries
+            if (!this.isRetryableError(error)) {
+              // Wrap in a non-retryable marker
+              const nonRetryableError = new Error(`${context}: ${error instanceof Error ? error.message : 'Unknown error'}`)
+              ;(nonRetryableError as any).__nonRetryable = true
+              throw nonRetryableError
+            }
+            // Re-throw retryable errors to trigger retry
+            throw error
+          }
+        },
+        {
+          retries: this.maxRetries,
+          delay: (attempts) => Math.min(this.baseDelay * Math.pow(2, attempts), 10000),
+        },
+      )
     }
-    catch (firstError) {
-      // If error is not retryable, fail immediately without retry
-      if (!this.isRetryableError(firstError)) {
-        throw new Error(`${context}: ${firstError instanceof Error ? firstError.message : 'Unknown error'}`)
+    catch (error) {
+      // If it's a non-retryable error, throw as-is
+      if (typeof error === 'object' && error !== null && (error as any).__nonRetryable) {
+        throw error
       }
-
-      // Error is retryable, use es-toolkit retry for subsequent attempts
-      try {
-        return await retry(
-          operation,
-          {
-            retries: this.maxRetries,
-            delay: (attempts) => Math.min(this.baseDelay * Math.pow(2, attempts), 10000),
-          },
-        )
-      }
-      catch (retryError) {
-        throw new Error(`${context}: ${retryError instanceof Error ? retryError.message : 'Unknown error'}`)
-      }
+      // If it was retryable but still failed after all retries
+      throw new Error(`${context}: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
@@ -198,10 +212,10 @@ export class GeminiEmbedding extends Embedding {
           results.push(result)
         }
         catch (individualError) {
-          // If individual request also fails, re-throw the error
-          throw new Error(
-            `Gemini batch embedding failed (batch and individual): ${individualError instanceof Error ? individualError.message : 'Unknown error'}`,
-          )
+          // If individual request also fails, re-throw the error with cause
+          const error = new Error('Gemini batch embedding failed (both batch and individual attempts failed)')
+          ;(error as any).cause = individualError
+          throw error
         }
       }
 
