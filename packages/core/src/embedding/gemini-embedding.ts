@@ -1,6 +1,5 @@
 import type { ContentEmbedding } from '@google/genai'
 import type { EmbeddingVector } from './base-embedding'
-import { retry } from 'es-toolkit'
 import { GoogleGenAI } from '@google/genai'
 import { Embedding } from './base-embedding'
 
@@ -97,7 +96,15 @@ export class GeminiEmbedding extends Embedding {
   }
 
   /**
-   * Execute operation with retry logic using es-toolkit retry
+   * Sleep for specified milliseconds
+   * @param ms Milliseconds to sleep
+   */
+  private async sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms))
+  }
+
+  /**
+   * Execute operation with retry logic
    * Only retries on retryable errors (network errors, rate limits, server errors)
    * @param operation Operation to execute
    * @param context Context string for error messages
@@ -107,40 +114,39 @@ export class GeminiEmbedding extends Embedding {
     operation: () => Promise<T>,
     context: string,
   ): Promise<T> {
-    try {
-      return await retry(
-        async () => {
-          try {
-            return await operation()
-          }
-          catch (error) {
-            // If error is not retryable, throw a special error to stop retries
-            if (!this.isRetryableError(error)) {
-              // Wrap in a non-retryable marker while preserving original error
-              const nonRetryableError = new Error(`${context}: ${error instanceof Error ? error.message : 'Unknown error'}`, {
-                cause: error,
-              })
-              ;(nonRetryableError as any).__nonRetryable = true
-              throw nonRetryableError
-            }
-            // Re-throw retryable errors to trigger retry
-            throw error
-          }
-        },
-        {
-          retries: this.maxRetries,
-          delay: (attempts) => Math.min(this.baseDelay * Math.pow(2, attempts), 10000),
-        },
-      )
-    }
-    catch (error) {
-      // If it's a non-retryable error, throw as-is
-      if (typeof error === 'object' && error !== null && (error as any).__nonRetryable) {
-        throw error
+    let lastError: unknown
+
+    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+      try {
+        return await operation()
       }
-      // If it was retryable but still failed after all retries
-      throw new Error(`${context}: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      catch (error) {
+        lastError = error
+
+        // If error is not retryable, fail immediately
+        if (!this.isRetryableError(error)) {
+          const err = new Error(`${context}: ${error instanceof Error ? error.message : 'Unknown error'}`)
+          ;(err as any).cause = error
+          throw err
+        }
+
+        // If we've exhausted all retries, throw the error
+        if (attempt === this.maxRetries) {
+          const err = new Error(`${context}: ${error instanceof Error ? error.message : 'Unknown error'}`)
+          ;(err as any).cause = error
+          throw err
+        }
+
+        // Calculate delay with exponential backoff (capped at 10s)
+        const delay = Math.min(this.baseDelay * Math.pow(2, attempt), 10000)
+        await this.sleep(delay)
+      }
     }
+
+    // This should never be reached, but TypeScript needs it
+    const err = new Error(`${context}: ${lastError instanceof Error ? lastError.message : 'Unknown error'}`)
+    ;(err as any).cause = lastError
+    throw err
   }
 
   async detectDimension(): Promise<number> {
@@ -221,9 +227,8 @@ export class GeminiEmbedding extends Embedding {
         }
         catch (individualError) {
           // If individual request also fails, re-throw the error with cause
-          const error = new Error('Gemini batch embedding failed (both batch and individual attempts failed)', {
-            cause: individualError,
-          })
+          const error = new Error('Gemini batch embedding failed (both batch and individual attempts failed)')
+          ;(error as any).cause = individualError
           throw error
         }
       }
