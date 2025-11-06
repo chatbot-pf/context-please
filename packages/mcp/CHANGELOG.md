@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.2](https://github.com/chatbot-pf/context-please/compare/mcp-v0.3.1...mcp-v0.3.2) (2025-10-31)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @pleaseai/context-please-core bumped to 0.4.0
+
 ## [0.3.1](https://github.com/chatbot-pf/context-please/compare/mcp-v0.3.0...mcp-v0.3.1) (2025-10-30)
 
 
