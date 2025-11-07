@@ -299,12 +299,9 @@ export class SimpleBM25 implements SparseVectorGenerator {
   /**
    * Serialize the BM25 model to JSON
    * Exports the trained state including vocabulary, IDF scores, and avgDocLength
+   * Can serialize untrained models (for empty hybrid collections)
    */
   toJSON(): string {
-    if (!this.trained) {
-      throw new Error('Cannot serialize untrained BM25 model')
-    }
-
     return JSON.stringify({
       k1: this.k1,
       b: this.b,

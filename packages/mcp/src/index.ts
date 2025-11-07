@@ -10,7 +10,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
-import { Context, MilvusVectorDatabase, QdrantVectorDatabase, VectorDatabase } from '@pleaseai/context-please-core'
+import { Context, FaissVectorDatabase, MilvusVectorDatabase, QdrantVectorDatabase, VectorDatabase } from '@pleaseai/context-please-core'
 
 // Import our modular components
 import { ContextMcpConfig, createMcpConfig, logConfigurationSummary, showHelpMessage } from './config.js'
@@ -59,11 +59,25 @@ class ContextMcpServer {
     logEmbeddingProviderInfo(config, embedding)
 
     // Initialize vector database based on configuration
-    console.log(`[VECTORDB] Initializing vector database: ${config.vectorDbType || 'milvus'}`)
-
+    // Auto-select FAISS if no external database is configured
     let vectorDatabase: VectorDatabase
 
-    if (config.vectorDbType === 'qdrant') {
+    const hasExternalDb = config.milvusAddress || config.milvusToken || config.qdrantUrl
+
+    if (!hasExternalDb && !config.vectorDbType) {
+      // Default to FAISS for zero-config local development
+      console.log('[VECTORDB] No external vector database configured, using FAISS (local file-based)')
+      vectorDatabase = new FaissVectorDatabase({
+        storageDir: process.env.FAISS_STORAGE_DIR,
+      })
+    }
+    else if (config.vectorDbType === 'faiss' || config.vectorDbType === 'faiss-local') {
+      console.log('[VECTORDB] Using FAISS (local file-based)')
+      vectorDatabase = new FaissVectorDatabase({
+        storageDir: process.env.FAISS_STORAGE_DIR,
+      })
+    }
+    else if (config.vectorDbType === 'qdrant') {
       // Parse Qdrant URL to get address for gRPC
       const qdrantUrl = config.qdrantUrl || 'http://localhost:6333'
       const url = new URL(qdrantUrl.startsWith('http') ? qdrantUrl : `http://${qdrantUrl}`)
@@ -86,6 +100,7 @@ class ContextMcpServer {
     }
     else {
       // Default to Milvus
+      console.log(`[VECTORDB] Using Milvus: ${config.milvusAddress || 'default'}`)
       vectorDatabase = new MilvusVectorDatabase({
         address: config.milvusAddress,
         ...(config.milvusToken && { token: config.milvusToken }),
