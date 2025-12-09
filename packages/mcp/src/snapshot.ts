@@ -151,6 +151,7 @@ export class SnapshotManager {
   public getIndexingCodebases(): string[] {
     // Return in-memory state as the source of truth during active session.
     // This eliminates the race condition between setCodebaseIndexing() and saveCodebaseSnapshot().
+    // See: https://github.com/pleaseai/context-please/issues/49
     return Array.from(this.indexingCodebases.keys())
   }
 
@@ -164,6 +165,7 @@ export class SnapshotManager {
   public getIndexingProgress(codebasePath: string): number | undefined {
     // Return in-memory state as the source of truth during active session.
     // This eliminates the race condition between setCodebaseIndexing() and saveCodebaseSnapshot().
+    // See: https://github.com/pleaseai/context-please/issues/49
     return this.indexingCodebases.get(codebasePath)
   }
 

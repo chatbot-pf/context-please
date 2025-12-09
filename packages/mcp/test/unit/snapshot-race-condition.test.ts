@@ -25,7 +25,7 @@ vi.mock('node:fs', () => ({
   mkdirSync: vi.fn(),
 }))
 
-describe('snapshotManager Race Condition Fix', () => {
+describe('SnapshotManager Race Condition Fix', () => {
   let snapshotManager: SnapshotManager
 
   beforeEach(() => {
@@ -143,7 +143,98 @@ describe('snapshotManager Race Condition Fix', () => {
     })
   })
 
-  describe('state Transition Flow', () => {
+  describe('getCodebaseInfo - Race Condition Fix', () => {
+    it('should return info immediately after setCodebaseIndexed() - before disk save', () => {
+      // Arrange
+      const codebasePath = '/test/project'
+
+      // Act: Set codebase as indexed
+      snapshotManager.setCodebaseIndexed(codebasePath, {
+        indexedFiles: 10,
+        totalChunks: 100,
+        status: 'completed',
+      })
+      // NOTE: saveCodebaseSnapshot() NOT called yet - simulating race window
+
+      // Assert: getCodebaseInfo should return the info immediately
+      const info = snapshotManager.getCodebaseInfo(codebasePath)
+      expect(info).toBeDefined()
+      expect(info?.status).toBe('indexed')
+      if (info?.status === 'indexed') {
+        expect(info.indexedFiles).toBe(10)
+        expect(info.totalChunks).toBe(100)
+        expect(info.indexStatus).toBe('completed')
+      }
+    })
+
+    it('should return info immediately after setCodebaseIndexing() - before disk save', () => {
+      // Arrange
+      const codebasePath = '/test/project'
+
+      // Act: Set codebase to indexing state
+      snapshotManager.setCodebaseIndexing(codebasePath, 75)
+      // NOTE: saveCodebaseSnapshot() NOT called yet - simulating race window
+
+      // Assert: getCodebaseInfo should return the info immediately
+      const info = snapshotManager.getCodebaseInfo(codebasePath)
+      expect(info).toBeDefined()
+      expect(info?.status).toBe('indexing')
+      if (info?.status === 'indexing') {
+        expect(info.indexingPercentage).toBe(75)
+      }
+    })
+
+    it('should return undefined for unknown codebase', () => {
+      // Arrange
+      const codebasePath = '/test/unknown'
+
+      // Act & Assert
+      const info = snapshotManager.getCodebaseInfo(codebasePath)
+      expect(info).toBeUndefined()
+    })
+  })
+
+  describe('getFailedCodebases - Race Condition Fix', () => {
+    it('should return failed codebases immediately after setCodebaseIndexFailed() - before disk save', () => {
+      // Arrange
+      const codebasePath = '/test/project'
+
+      // Act: Set codebase to failed state
+      snapshotManager.setCodebaseIndexFailed(codebasePath, 'Network error', 50)
+      // NOTE: saveCodebaseSnapshot() NOT called yet - simulating race window
+
+      // Assert: getFailedCodebases should return the path immediately
+      const failedCodebases = snapshotManager.getFailedCodebases()
+      expect(failedCodebases).toContain(codebasePath)
+    })
+
+    it('should not include codebase that was never failed', () => {
+      // Arrange: Fresh snapshot manager
+      const codebasePath = '/test/project'
+
+      // Act: Query failed codebases
+      const failedCodebases = snapshotManager.getFailedCodebases()
+
+      // Assert: Should not contain the path
+      expect(failedCodebases).not.toContain(codebasePath)
+      expect(failedCodebases).toHaveLength(0)
+    })
+
+    it('should not include codebase that transitioned from failed to indexing', () => {
+      // Arrange
+      const codebasePath = '/test/project'
+      snapshotManager.setCodebaseIndexFailed(codebasePath, 'Previous error', 25)
+
+      // Act: Start re-indexing
+      snapshotManager.setCodebaseIndexing(codebasePath, 0)
+
+      // Assert: Should no longer appear in failed list
+      const failedCodebases = snapshotManager.getFailedCodebases()
+      expect(failedCodebases).not.toContain(codebasePath)
+    })
+  })
+
+  describe('State Transition Flow', () => {
     it('should correctly transition from indexing → indexed', () => {
       // This simulates the real flow in startBackgroundIndexing()
       const codebasePath = '/test/project'
