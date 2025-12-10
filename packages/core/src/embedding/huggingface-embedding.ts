@@ -226,24 +226,18 @@ export class HuggingFaceEmbedding extends Embedding {
       }))
     }
     catch (error) {
-      // Fallback: process individually if batch fails
+      // Fallback: process individually in parallel if batch fails
       const batchErrorMessage = error instanceof Error ? error.message : 'Unknown error'
-      console.warn(`[HuggingFace] Batch embedding failed: ${batchErrorMessage}, falling back to individual processing`)
+      console.warn(`[HuggingFace] Batch embedding failed: ${batchErrorMessage}, falling back to parallel individual processing`)
 
-      const results: EmbeddingVector[] = []
-      for (const text of texts) {
-        try {
-          const result = await this.embed(text)
-          results.push(result)
-        }
-        catch (individualError) {
-          const err = new Error(`HuggingFace batch embedding failed (both batch and individual attempts failed): ${batchErrorMessage}`)
-          ;(err as Error & { cause?: unknown }).cause = individualError
-          throw err
-        }
+      try {
+        return await Promise.all(texts.map(text => this.embed(text)))
       }
-
-      return results
+      catch (individualError) {
+        const err = new Error(`HuggingFace batch embedding failed (both batch and individual attempts failed): ${batchErrorMessage}`)
+        ;(err as Error & { cause?: unknown }).cause = individualError
+        throw err
+      }
     }
   }
 
