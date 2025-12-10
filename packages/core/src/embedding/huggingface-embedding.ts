@@ -34,7 +34,8 @@ export class HuggingFaceEmbedding extends Embedding {
     }
 
     // Set dimension and query prefix based on model
-    const modelInfo = HuggingFaceEmbedding.getSupportedModels()[this.config.model!]
+    const modelId = this.config.model ?? 'MongoDB/mdbr-leaf-ir'
+    const modelInfo = HuggingFaceEmbedding.getSupportedModels()[modelId]
     if (modelInfo) {
       this.dimension = modelInfo.dimension
       this.maxTokens = modelInfo.maxTokens
@@ -111,7 +112,7 @@ export class HuggingFaceEmbedding extends Embedding {
   private async loadModel(): Promise<void> {
     try {
       const transformers = await this.getTransformersModule()
-      const modelId = this.config.model!
+      const modelId = this.config.model ?? 'MongoDB/mdbr-leaf-ir'
 
       console.log(`[HuggingFace] Loading model: ${modelId} (dtype: ${this.config.dtype})`)
 
@@ -178,7 +179,9 @@ export class HuggingFaceEmbedding extends Embedding {
     }
     catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      throw new Error(`HuggingFace embedding failed: ${errorMessage}`)
+      const err = new Error(`HuggingFace embedding failed: ${errorMessage}`)
+      ;(err as Error & { cause?: unknown }).cause = error
+      throw err
     }
   }
 
@@ -214,12 +217,20 @@ export class HuggingFaceEmbedding extends Embedding {
     }
     catch (error) {
       // Fallback: process individually if batch fails
-      console.warn('[HuggingFace] Batch embedding failed, falling back to individual processing')
-      const results: EmbeddingVector[] = []
+      const batchErrorMessage = error instanceof Error ? error.message : 'Unknown error'
+      console.warn(`[HuggingFace] Batch embedding failed: ${batchErrorMessage}, falling back to individual processing`)
 
+      const results: EmbeddingVector[] = []
       for (const text of texts) {
-        const result = await this.embed(text)
-        results.push(result)
+        try {
+          const result = await this.embed(text)
+          results.push(result)
+        }
+        catch (individualError) {
+          const err = new Error(`HuggingFace batch embedding failed (both batch and individual attempts failed): ${batchErrorMessage}`)
+          ;(err as Error & { cause?: unknown }).cause = individualError
+          throw err
+        }
       }
 
       return results
@@ -238,14 +249,14 @@ export class HuggingFaceEmbedding extends Embedding {
    * Get the current model ID
    */
   getModel(): string {
-    return this.config.model!
+    return this.config.model ?? 'MongoDB/mdbr-leaf-ir'
   }
 
   /**
    * Get the current dtype setting
    */
   getDtype(): HuggingFaceDtype {
-    return this.config.dtype!
+    return this.config.dtype ?? 'fp32'
   }
 
   /**

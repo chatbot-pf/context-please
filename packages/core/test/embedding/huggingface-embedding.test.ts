@@ -209,7 +209,7 @@ describe('HuggingFaceEmbedding', () => {
   })
 
   // ============================================================================
-  // 5. Error Handling (3 tests)
+  // 5. Error Handling (7 tests)
   // ============================================================================
   describe('error handling', () => {
     it('should throw error when model fails to load', async () => {
@@ -218,10 +218,46 @@ describe('HuggingFaceEmbedding', () => {
       await expect(embedding.embed('test')).rejects.toThrow('Failed to load HuggingFace model')
     })
 
+    it('should throw error when tokenizer fails to load', async () => {
+      mockFromPretrainedTokenizer.mockRejectedValue(new Error('Tokenizer not found'))
+
+      await expect(embedding.embed('test')).rejects.toThrow('Failed to load HuggingFace model')
+    })
+
+    it('should allow retry after model load failure', async () => {
+      // First attempt fails
+      mockFromPretrainedModel.mockRejectedValueOnce(new Error('Network error'))
+
+      await expect(embedding.embed('test')).rejects.toThrow('Failed to load HuggingFace model')
+
+      // Reset mocks for retry
+      mockFromPretrainedModel.mockResolvedValue(mockModel)
+      mockFromPretrainedTokenizer.mockResolvedValue(mockTokenizer)
+
+      // Second attempt should succeed
+      const result = await embedding.embed('test')
+      expect(result.vector).toHaveLength(768)
+    })
+
     it('should throw error when model returns no sentence_embedding', async () => {
       mockModel.mockResolvedValue({})
 
       await expect(embedding.embed('test')).rejects.toThrow('Model did not return sentence_embedding')
+    })
+
+    it('should preserve error cause in embed method', async () => {
+      const originalError = new Error('Original embedding error')
+      mockModel.mockRejectedValueOnce(originalError)
+
+      try {
+        await embedding.embed('test')
+        expect.fail('Should have thrown')
+      }
+      catch (error) {
+        expect(error).toBeInstanceOf(Error)
+        expect((error as Error).message).toContain('HuggingFace embedding failed')
+        expect((error as Error & { cause?: unknown }).cause).toBe(originalError)
+      }
     })
 
     it('should fallback to individual processing when batch fails', async () => {
@@ -244,6 +280,21 @@ describe('HuggingFaceEmbedding', () => {
 
       expect(results).toHaveLength(2)
       expect(callCount).toBe(3) // 1 batch + 2 individual
+    })
+
+    it('should throw error when both batch and individual fail', async () => {
+      // All calls fail
+      mockModel.mockRejectedValue(new Error('Embedding failed'))
+
+      try {
+        await embedding.embedBatch(['text1', 'text2'])
+        expect.fail('Should have thrown')
+      }
+      catch (error) {
+        expect(error).toBeInstanceOf(Error)
+        expect((error as Error).message).toContain('batch and individual attempts failed')
+        expect((error as Error & { cause?: unknown }).cause).toBeInstanceOf(Error)
+      }
     })
   })
 
