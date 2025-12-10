@@ -78,6 +78,25 @@ describe('HuggingFaceEmbedding', () => {
       })
       expect(customEmbedding.getQueryPrefix()).toBe('Custom prefix: ')
     })
+
+    it('should configure cache directory when specified', async () => {
+      const customEmbedding = new HuggingFaceEmbedding({
+        cacheDir: '/custom/cache/path',
+      })
+      await customEmbedding.embed('test')
+
+      // Verify env.cacheDir was set via mock
+      const transformers = await import('@huggingface/transformers')
+      expect(transformers.env.cacheDir).toBe('/custom/cache/path')
+    })
+
+    it('should use default dimension for unsupported models', () => {
+      const customEmbedding = new HuggingFaceEmbedding({
+        model: 'custom/unknown-model',
+      })
+      expect(customEmbedding.getDimension()).toBe(768) // default
+      expect(customEmbedding.getQueryPrefix()).toBeUndefined()
+    })
   })
 
   // ============================================================================

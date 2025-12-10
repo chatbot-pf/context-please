@@ -98,6 +98,11 @@ export function getEmbeddingModelForProvider(provider: string): string {
       const ollamaModel = envManager.get('OLLAMA_MODEL') || envManager.get('EMBEDDING_MODEL') || getDefaultModelForProvider(provider)
       console.log(`[DEBUG] 🎯 Ollama model selection: OLLAMA_MODEL=${envManager.get('OLLAMA_MODEL') || 'NOT SET'}, EMBEDDING_MODEL=${envManager.get('EMBEDDING_MODEL') || 'NOT SET'}, selected=${ollamaModel}`)
       return ollamaModel
+    case 'HuggingFace':
+      // For HuggingFace, use EMBEDDING_MODEL or default LEAF model
+      const hfModel = envManager.get('EMBEDDING_MODEL') || getDefaultModelForProvider(provider)
+      console.log(`[DEBUG] 🎯 HuggingFace model selection: EMBEDDING_MODEL=${envManager.get('EMBEDDING_MODEL') || 'NOT SET'}, selected=${hfModel}`)
+      return hfModel
     case 'OpenAI':
     case 'VoyageAI':
     case 'Gemini':

@@ -132,7 +132,9 @@ export class HuggingFaceEmbedding extends Embedding {
     catch (error) {
       this.modelLoading = null // Reset so it can be retried
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      throw new Error(`Failed to load HuggingFace model ${this.config.model}: ${errorMessage}`)
+      const err = new Error(`Failed to load HuggingFace model ${this.config.model}: ${errorMessage}`)
+      ;(err as Error & { cause?: unknown }).cause = error
+      throw err
     }
   }
 
@@ -154,15 +156,19 @@ export class HuggingFaceEmbedding extends Embedding {
   async embed(text: string): Promise<EmbeddingVector> {
     await this.ensureModel()
 
+    if (!this.model || !this.tokenizer) {
+      throw new Error('Model or tokenizer failed to initialize')
+    }
+
     const processedText = this.preprocessText(text)
     const prefixedText = this.applyQueryPrefix(processedText)
 
     try {
       // Tokenize
-      const inputs = await this.tokenizer!([prefixedText], { padding: true })
+      const inputs = await this.tokenizer([prefixedText], { padding: true })
 
       // Get embeddings
-      const outputs = await this.model!(inputs)
+      const outputs = await this.model(inputs)
 
       // Extract sentence embedding
       if (!outputs.sentence_embedding) {
@@ -192,15 +198,19 @@ export class HuggingFaceEmbedding extends Embedding {
 
     await this.ensureModel()
 
+    if (!this.model || !this.tokenizer) {
+      throw new Error('Model or tokenizer failed to initialize')
+    }
+
     const processedTexts = this.preprocessTexts(texts)
     const prefixedTexts = processedTexts.map(text => this.applyQueryPrefix(text))
 
     try {
       // Tokenize batch
-      const inputs = await this.tokenizer!(prefixedTexts, { padding: true })
+      const inputs = await this.tokenizer(prefixedTexts, { padding: true })
 
       // Get embeddings
-      const outputs = await this.model!(inputs)
+      const outputs = await this.model(inputs)
 
       // Extract sentence embeddings
       if (!outputs.sentence_embedding) {
