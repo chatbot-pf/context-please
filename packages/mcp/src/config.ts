@@ -4,7 +4,7 @@ export interface ContextMcpConfig {
   name: string
   version: string
   // Embedding provider configuration
-  embeddingProvider: 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama'
+  embeddingProvider: 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama' | 'HuggingFace'
   embeddingModel: string
   // Provider-specific API keys
   openaiApiKey?: string
@@ -15,6 +15,8 @@ export interface ContextMcpConfig {
   // Ollama configuration
   ollamaModel?: string
   ollamaHost?: string
+  // HuggingFace configuration
+  huggingfaceDtype?: 'fp32' | 'fp16' | 'q8' | 'q4' | 'q4f16'
   // Vector database configuration
   vectorDbType?: 'milvus' | 'qdrant' // Vector database type (default: milvus)
   milvusAddress?: string // Optional, can be auto-resolved from token
@@ -81,6 +83,8 @@ export function getDefaultModelForProvider(provider: string): string {
       return 'gemini-embedding-001'
     case 'Ollama':
       return 'nomic-embed-text'
+    case 'HuggingFace':
+      return 'MongoDB/mdbr-leaf-ir'
     default:
       return 'text-embedding-3-small'
   }
@@ -94,6 +98,11 @@ export function getEmbeddingModelForProvider(provider: string): string {
       const ollamaModel = envManager.get('OLLAMA_MODEL') || envManager.get('EMBEDDING_MODEL') || getDefaultModelForProvider(provider)
       console.log(`[DEBUG] 🎯 Ollama model selection: OLLAMA_MODEL=${envManager.get('OLLAMA_MODEL') || 'NOT SET'}, EMBEDDING_MODEL=${envManager.get('EMBEDDING_MODEL') || 'NOT SET'}, selected=${ollamaModel}`)
       return ollamaModel
+    case 'HuggingFace':
+      // For HuggingFace, use EMBEDDING_MODEL or default LEAF model
+      const hfModel = envManager.get('EMBEDDING_MODEL') || getDefaultModelForProvider(provider)
+      console.log(`[DEBUG] 🎯 HuggingFace model selection: EMBEDDING_MODEL=${envManager.get('EMBEDDING_MODEL') || 'NOT SET'}, selected=${hfModel}`)
+      return hfModel
     case 'OpenAI':
     case 'VoyageAI':
     case 'Gemini':
@@ -113,6 +122,7 @@ export function createMcpConfig(): ContextMcpConfig {
   console.log(`[DEBUG]   OLLAMA_MODEL: ${envManager.get('OLLAMA_MODEL') || 'NOT SET'}`)
   console.log(`[DEBUG]   GEMINI_API_KEY: ${envManager.get('GEMINI_API_KEY') ? `SET (length: ${envManager.get('GEMINI_API_KEY')!.length})` : 'NOT SET'}`)
   console.log(`[DEBUG]   OPENAI_API_KEY: ${envManager.get('OPENAI_API_KEY') ? `SET (length: ${envManager.get('OPENAI_API_KEY')!.length})` : 'NOT SET'}`)
+  console.log(`[DEBUG]   HUGGINGFACE_DTYPE: ${envManager.get('HUGGINGFACE_DTYPE') || 'NOT SET'}`)
   console.log(`[DEBUG]   VECTOR_DB_TYPE: ${envManager.get('VECTOR_DB_TYPE') || 'NOT SET'}`)
   console.log(`[DEBUG]   MILVUS_ADDRESS: ${envManager.get('MILVUS_ADDRESS') || 'NOT SET'}`)
   console.log(`[DEBUG]   QDRANT_URL: ${envManager.get('QDRANT_URL') || 'NOT SET'}`)
@@ -122,7 +132,7 @@ export function createMcpConfig(): ContextMcpConfig {
     name: envManager.get('MCP_SERVER_NAME') || 'Context MCP Server',
     version: envManager.get('MCP_SERVER_VERSION') || '1.0.0',
     // Embedding provider configuration
-    embeddingProvider: (envManager.get('EMBEDDING_PROVIDER') as 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama') || 'OpenAI',
+    embeddingProvider: (envManager.get('EMBEDDING_PROVIDER') as 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama' | 'HuggingFace') || 'OpenAI',
     embeddingModel: getEmbeddingModelForProvider(envManager.get('EMBEDDING_PROVIDER') || 'OpenAI'),
     // Provider-specific API keys
     openaiApiKey: envManager.get('OPENAI_API_KEY'),
@@ -133,6 +143,8 @@ export function createMcpConfig(): ContextMcpConfig {
     // Ollama configuration
     ollamaModel: envManager.get('OLLAMA_MODEL'),
     ollamaHost: envManager.get('OLLAMA_HOST'),
+    // HuggingFace configuration
+    huggingfaceDtype: (envManager.get('HUGGINGFACE_DTYPE') as 'fp32' | 'fp16' | 'q8' | 'q4' | 'q4f16') || undefined,
     // Vector database configuration
     vectorDbType: (envManager.get('VECTOR_DB_TYPE') as 'milvus' | 'qdrant') || 'milvus',
     milvusAddress: envManager.get('MILVUS_ADDRESS'), // Optional, can be resolved from token
@@ -183,6 +195,10 @@ export function logConfigurationSummary(config: ContextMcpConfig): void {
       console.log(`[MCP]   Ollama Host: ${config.ollamaHost || 'http://127.0.0.1:11434'}`)
       console.log(`[MCP]   Ollama Model: ${config.embeddingModel}`)
       break
+    case 'HuggingFace':
+      console.log(`[MCP]   HuggingFace Model: ${config.embeddingModel}`)
+      console.log(`[MCP]   HuggingFace Dtype: ${config.huggingfaceDtype || 'fp32'}`)
+      break
   }
 
   console.log(`[MCP] 🔧 Initializing server components...`)
@@ -200,9 +216,9 @@ Options:
 Environment Variables:
   MCP_SERVER_NAME         Server name
   MCP_SERVER_VERSION      Server version
-  
+
   Embedding Provider Configuration:
-  EMBEDDING_PROVIDER      Embedding provider: OpenAI, VoyageAI, Gemini, Ollama (default: OpenAI)
+  EMBEDDING_PROVIDER      Embedding provider: OpenAI, VoyageAI, Gemini, Ollama, HuggingFace (default: OpenAI)
   EMBEDDING_MODEL         Embedding model name (works for all providers)
   
   Provider-specific API Keys:
@@ -215,7 +231,10 @@ Environment Variables:
   Ollama Configuration:
   OLLAMA_HOST             Ollama server host (default: http://127.0.0.1:11434)
   OLLAMA_MODEL            Ollama model name (alternative to EMBEDDING_MODEL for Ollama)
-  
+
+  HuggingFace Configuration:
+  HUGGINGFACE_DTYPE       Model dtype: fp32, fp16, q8, q4, q4f16 (default: fp32)
+
   Vector Database Configuration:
   VECTOR_DB_TYPE          Vector database type: milvus (default) or qdrant
   MILVUS_ADDRESS          Milvus address (optional, can be auto-resolved from token)
@@ -247,5 +266,11 @@ Examples:
 
   # Start MCP server with Qdrant Cloud
   OPENAI_API_KEY=sk-xxx VECTOR_DB_TYPE=qdrant QDRANT_URL=https://your-cluster.qdrant.io QDRANT_API_KEY=your-api-key npx @pleaseai/context-please-mcp@latest
+
+  # Start MCP server with HuggingFace LEAF model (local inference, no API key needed)
+  EMBEDDING_PROVIDER=HuggingFace EMBEDDING_MODEL=MongoDB/mdbr-leaf-ir MILVUS_TOKEN=your-token npx @pleaseai/context-please-mcp@latest
+
+  # Start MCP server with HuggingFace and quantized model for faster inference
+  EMBEDDING_PROVIDER=HuggingFace HUGGINGFACE_DTYPE=q8 MILVUS_TOKEN=your-token npx @pleaseai/context-please-mcp@latest
         `)
 }

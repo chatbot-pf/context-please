@@ -2,6 +2,7 @@
 export * from './base-embedding'
 
 export * from './gemini-embedding'
+export * from './huggingface-embedding'
 export * from './ollama-embedding'
 // Implementation class exports
 export * from './openai-embedding'
