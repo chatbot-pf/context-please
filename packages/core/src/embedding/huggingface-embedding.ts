@@ -27,8 +27,8 @@ export class HuggingFaceEmbedding extends Embedding {
   constructor(config: HuggingFaceEmbeddingConfig = {}) {
     super()
     this.config = {
-      model: config.model || 'MongoDB/mdbr-leaf-ir',
-      dtype: config.dtype || 'fp32',
+      model: config.model ?? 'MongoDB/mdbr-leaf-ir',
+      dtype: config.dtype ?? 'fp32',
       queryPrefix: config.queryPrefix,
       cacheDir: config.cacheDir,
     }
