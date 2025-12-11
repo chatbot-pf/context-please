@@ -18,7 +18,7 @@ export interface ContextMcpConfig {
   // HuggingFace configuration
   huggingfaceDtype?: 'fp32' | 'fp16' | 'q8' | 'q4' | 'q4f16'
   // Vector database configuration
-  vectorDbType?: 'milvus' | 'qdrant' // Vector database type (default: milvus)
+  vectorDbType?: 'milvus' | 'qdrant' | 'faiss' // Vector database type (default: milvus, or faiss if no external db configured)
   milvusAddress?: string // Optional, can be auto-resolved from token
   milvusToken?: string
   qdrantUrl?: string // Qdrant URL (e.g., http://localhost:6333 or cloud URL)

@@ -10,7 +10,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
-import { Context, FaissVectorDatabase, MilvusVectorDatabase, QdrantVectorDatabase, VectorDatabase } from '@pleaseai/context-please-core'
+import { Context, MilvusVectorDatabase, QdrantVectorDatabase, VectorDatabase, VectorDatabaseFactory } from '@pleaseai/context-please-core'
 
 // Import our modular components
 import { ContextMcpConfig, createMcpConfig, logConfigurationSummary, showHelpMessage } from './config.js'
@@ -59,21 +59,41 @@ class ContextMcpServer {
     logEmbeddingProviderInfo(config, embedding)
 
     // Initialize vector database based on configuration
-    // Auto-select FAISS if no external database is configured
+    // Auto-select FAISS if no external database is configured and FAISS is available
     let vectorDatabase: VectorDatabase
 
     const hasExternalDb = config.milvusAddress || config.milvusToken || config.qdrantUrl
+    const faissAvailable = VectorDatabaseFactory.isFaissAvailable()
 
     if (!hasExternalDb && !config.vectorDbType) {
-      // Default to FAISS for zero-config local development
-      console.log('[VECTORDB] No external vector database configured, using FAISS (local file-based)')
-      vectorDatabase = new FaissVectorDatabase({
-        storageDir: process.env.FAISS_STORAGE_DIR,
-      })
+      // Default to FAISS for zero-config local development (if available)
+      if (faissAvailable) {
+        console.log('[VECTORDB] No external vector database configured, using FAISS (local file-based)')
+        vectorDatabase = VectorDatabaseFactory.create('faiss-local' as any, {
+          storageDir: process.env.FAISS_STORAGE_DIR,
+        })
+      }
+      else {
+        // FAISS not available, require explicit configuration
+        console.error('[VECTORDB] ❌ No vector database configured and FAISS is not available.')
+        console.error('[VECTORDB] Please configure one of the following:')
+        console.error('[VECTORDB]   - MILVUS_ADDRESS or MILVUS_TOKEN for Milvus')
+        console.error('[VECTORDB]   - QDRANT_URL for Qdrant')
+        throw new Error(
+          'No vector database configured. FAISS native bindings are not available in this environment. '
+          + 'Please set MILVUS_ADDRESS/MILVUS_TOKEN or QDRANT_URL to use an external vector database.',
+        )
+      }
     }
-    else if (config.vectorDbType === 'faiss' || config.vectorDbType === 'faiss-local') {
+    else if (config.vectorDbType === 'faiss') {
+      if (!faissAvailable) {
+        throw new Error(
+          'FAISS vector database was explicitly requested but native bindings are not available. '
+          + 'Please use VECTOR_DB_TYPE=milvus or VECTOR_DB_TYPE=qdrant instead.',
+        )
+      }
       console.log('[VECTORDB] Using FAISS (local file-based)')
-      vectorDatabase = new FaissVectorDatabase({
+      vectorDatabase = VectorDatabaseFactory.create('faiss-local' as any, {
         storageDir: process.env.FAISS_STORAGE_DIR,
       })
     }
