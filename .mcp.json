@@ -6,9 +6,8 @@
       "env": {
         "EMBEDDING_PROVIDER": "HuggingFace",
         "EMBEDDING_MODEL": "MongoDB/mdbr-leaf-ir",
-        "VECTOR_DB_TYPE": "faiss"
+        "VECTOR_DB_TYPE": "faiss-local"
       }
     }
-  },
-  
+  }
 }

@@ -25,22 +25,28 @@ function checkFaissAvailability(): boolean {
   }
   catch (error: any) {
     const errorMsg = error.message || String(error)
+    const errorCode = error.code
 
-    // Check if it's a FAISS bindings error (allow FAISS to be unavailable)
-    if (errorMsg.includes('Could not locate the bindings file')
-        || errorMsg.includes('faiss-node')) {
+    // Treat as "FAISS unavailable" for:
+    // 1. Native binding errors (faiss-node not compiled)
+    // 2. Module not found errors (module path resolution in test environments)
+    const isExpectedUnavailableError
+      = errorMsg.includes('Could not locate the bindings file')
+      || errorMsg.includes('faiss-node')
+      || errorCode === 'MODULE_NOT_FOUND'
+
+    if (isExpectedUnavailableError) {
       faissAvailable = false
-      faissCheckError = 'FAISS native bindings not available'
-      console.warn('[VectorDatabaseFactory] FAISS native bindings not available. FAISS support disabled.')
+      faissCheckError = errorMsg.includes('faiss-node')
+        ? 'FAISS native bindings not available'
+        : 'FAISS module not found'
+      console.warn(`[VectorDatabaseFactory] ${faissCheckError}. FAISS support disabled.`)
       return false
     }
 
-    // For other errors (e.g., missing file during tests), also mark as unavailable
-    // but don't throw to allow tests to run
-    faissAvailable = false
-    faissCheckError = errorMsg
-    console.warn(`[VectorDatabaseFactory] FAISS unavailable: ${errorMsg}`)
-    return false
+    // For syntax errors, type errors, or other real bugs - re-throw
+    console.error('[VectorDatabaseFactory] Unexpected error loading FAISS module:', errorMsg)
+    throw error
   }
 }
 

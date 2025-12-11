@@ -18,7 +18,7 @@ export interface ContextMcpConfig {
   // HuggingFace configuration
   huggingfaceDtype?: 'fp32' | 'fp16' | 'q8' | 'q4' | 'q4f16'
   // Vector database configuration
-  vectorDbType?: 'milvus' | 'qdrant' | 'faiss' // Vector database type (default: milvus, or faiss if no external db configured)
+  vectorDbType?: 'milvus' | 'qdrant' | 'faiss-local' // Vector database type (default: faiss-local for local dev)
   milvusAddress?: string // Optional, can be auto-resolved from token
   milvusToken?: string
   qdrantUrl?: string // Qdrant URL (e.g., http://localhost:6333 or cloud URL)
@@ -133,7 +133,7 @@ export function createMcpConfig(): ContextMcpConfig {
     version: envManager.get('MCP_SERVER_VERSION') || '1.0.0',
     // Embedding provider configuration
     embeddingProvider: (envManager.get('EMBEDDING_PROVIDER') as 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama' | 'HuggingFace') || 'HuggingFace',
-    embeddingModel: getEmbeddingModelForProvider(envManager.get('EMBEDDING_PROVIDER') || 'MongoDB/mdbr-leaf-ir'),
+    embeddingModel: getEmbeddingModelForProvider(envManager.get('EMBEDDING_PROVIDER') || 'HuggingFace'),
     // Provider-specific API keys
     openaiApiKey: envManager.get('OPENAI_API_KEY'),
     openaiBaseUrl: envManager.get('OPENAI_BASE_URL'),
@@ -146,7 +146,7 @@ export function createMcpConfig(): ContextMcpConfig {
     // HuggingFace configuration
     huggingfaceDtype: (envManager.get('HUGGINGFACE_DTYPE') as 'fp32' | 'fp16' | 'q8' | 'q4' | 'q4f16') || undefined,
     // Vector database configuration
-    vectorDbType: (envManager.get('VECTOR_DB_TYPE') as 'milvus' | 'qdrant' | 'faiss') || 'faiss',
+    vectorDbType: (envManager.get('VECTOR_DB_TYPE') as 'milvus' | 'qdrant' | 'faiss-local') || 'faiss-local',
     milvusAddress: envManager.get('MILVUS_ADDRESS'), // Optional, can be resolved from token
     milvusToken: envManager.get('MILVUS_TOKEN'),
     qdrantUrl: envManager.get('QDRANT_URL'),
@@ -163,7 +163,7 @@ export function logConfigurationSummary(config: ContextMcpConfig): void {
   console.log(`[MCP]   Server: ${config.name} v${config.version}`)
   console.log(`[MCP]   Embedding Provider: ${config.embeddingProvider}`)
   console.log(`[MCP]   Embedding Model: ${config.embeddingModel}`)
-  console.log(`[MCP]   Vector Database: ${config.vectorDbType || 'milvus'}`)
+  console.log(`[MCP]   Vector Database: ${config.vectorDbType || 'faiss-local'}`)
 
   // Log vector database specific configuration
   if (config.vectorDbType === 'qdrant') {
@@ -236,7 +236,7 @@ Environment Variables:
   HUGGINGFACE_DTYPE       Model dtype: fp32, fp16, q8, q4, q4f16 (default: fp32)
 
   Vector Database Configuration:
-  VECTOR_DB_TYPE          Vector database type: milvus (default) or qdrant
+  VECTOR_DB_TYPE          Vector database type: faiss-local (default), milvus, or qdrant
   MILVUS_ADDRESS          Milvus address (optional, can be auto-resolved from token)
   MILVUS_TOKEN            Milvus token (optional, used for authentication and address resolution)
   QDRANT_URL              Qdrant URL (e.g., http://localhost:6333 or cloud URL)

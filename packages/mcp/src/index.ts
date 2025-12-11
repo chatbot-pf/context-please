@@ -10,7 +10,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
-import { Context, MilvusVectorDatabase, QdrantVectorDatabase, VectorDatabase, VectorDatabaseFactory } from '@pleaseai/context-please-core'
+import { Context, MilvusVectorDatabase, QdrantVectorDatabase, VectorDatabase, VectorDatabaseFactory, VectorDatabaseType } from '@pleaseai/context-please-core'
 
 // Import our modular components
 import { ContextMcpConfig, createMcpConfig, logConfigurationSummary, showHelpMessage } from './config.js'
@@ -69,7 +69,7 @@ class ContextMcpServer {
       // Default to FAISS for zero-config local development (if available)
       if (faissAvailable) {
         console.log('[VECTORDB] No external vector database configured, using FAISS (local file-based)')
-        vectorDatabase = VectorDatabaseFactory.create('faiss-local' as any, {
+        vectorDatabase = VectorDatabaseFactory.create(VectorDatabaseType.FAISS_LOCAL, {
           storageDir: process.env.FAISS_STORAGE_DIR,
         })
       }
@@ -85,7 +85,7 @@ class ContextMcpServer {
         )
       }
     }
-    else if (config.vectorDbType === 'faiss') {
+    else if (config.vectorDbType === 'faiss-local') {
       if (!faissAvailable) {
         throw new Error(
           'FAISS vector database was explicitly requested but native bindings are not available. '
@@ -93,7 +93,7 @@ class ContextMcpServer {
         )
       }
       console.log('[VECTORDB] Using FAISS (local file-based)')
-      vectorDatabase = VectorDatabaseFactory.create('faiss-local' as any, {
+      vectorDatabase = VectorDatabaseFactory.create(VectorDatabaseType.FAISS_LOCAL, {
         storageDir: process.env.FAISS_STORAGE_DIR,
       })
     }

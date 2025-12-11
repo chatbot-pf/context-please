@@ -161,6 +161,30 @@ describe('faissVectorDatabase', () => {
         .rejects
         .toThrow(/Failed to load collection metadata/)
     })
+
+    it('should handle corrupt documents file gracefully', async () => {
+      await faissDb.createCollection('corrupt-docs', 128)
+      await faissDb.insert('corrupt-docs', [testDoc])
+
+      // Corrupt documents file
+      const documentsPath = path.join(tempDir, 'corrupt-docs', 'documents.json')
+      await fs.writeFile(documentsPath, 'CORRUPTED_JSON{')
+
+      // Force unload and reload
+      ;(faissDb as any).collections.delete('corrupt-docs')
+
+      await expect((faissDb as any).loadCollection('corrupt-docs'))
+        .rejects
+        .toThrow(/Failed to load documents metadata/)
+    })
+
+    it('should throw error when searching non-existent collection', async () => {
+      const queryVector = Array.from({ length: 128 }).fill(0.1)
+
+      await expect(faissDb.search('non-existent', queryVector))
+        .rejects
+        .toThrow(/does not exist/)
+    })
   })
 
   describe('hybrid search', () => {
@@ -199,6 +223,33 @@ describe('faissVectorDatabase', () => {
 
       expect(results.length).toBeGreaterThan(0)
       expect(results[0].document.content).toContain('machine')
+    })
+
+    it('should throw error when calling insertHybrid on dense-only collection', async () => {
+      await faissDb.createCollection('dense-only', 128)
+
+      const docs: VectorDocument[] = [{
+        id: 'test',
+        vector: Array.from({ length: 128 }).fill(0.1),
+        content: 'test content',
+        relativePath: 'test.ts',
+        startLine: 1,
+        endLine: 10,
+        fileExtension: '.ts',
+        metadata: {},
+      }]
+
+      await expect(faissDb.insertHybrid('dense-only', docs))
+        .rejects
+        .toThrow(/is not a hybrid collection/)
+    })
+
+    it('should throw error when calling hybridSearch on dense-only collection', async () => {
+      await faissDb.createCollection('dense-only', 128)
+
+      await expect(faissDb.hybridSearch('dense-only', [
+        { anns_field: 'dense', data: Array.from({ length: 128 }).fill(0.1), limit: 10 },
+      ])).rejects.toThrow(/is not a hybrid collection/)
     })
   })
 

@@ -390,13 +390,35 @@ export class FaissVectorDatabase extends BaseVectorDatabase<FaissConfig> {
 
     console.log('[FaissDB] 🗑️  Dropping collection:', collectionName)
 
-    // Remove from memory
+    // Store reference in case we need to restore on disk error
+    const collectionBackup = this.collections.get(collectionName)
+
+    // Remove from memory first
     this.collections.delete(collectionName)
 
     // Remove from disk
     const collectionPath = this.getCollectionPath(collectionName)
-    if (await fs.pathExists(collectionPath)) {
-      await fs.remove(collectionPath)
+    try {
+      if (await fs.pathExists(collectionPath)) {
+        await fs.remove(collectionPath)
+      }
+    }
+    catch (error: any) {
+      // Restore in-memory state to maintain consistency
+      if (collectionBackup) {
+        this.collections.set(collectionName, collectionBackup)
+      }
+
+      const errorMsg = `Failed to remove collection '${collectionName}' from disk: ${error.message}`
+      console.error(`[FaissDB] ❌ ${errorMsg}`)
+
+      if (error.code === 'EACCES') {
+        throw new Error(`${errorMsg}\nPermission denied. Check file permissions.`)
+      }
+      else if (error.code === 'EBUSY') {
+        throw new Error(`${errorMsg}\nFiles are in use by another process.`)
+      }
+      throw new Error(errorMsg)
     }
 
     console.log('[FaissDB] ✅ Collection dropped:', collectionName)
@@ -636,131 +658,154 @@ export class FaissVectorDatabase extends BaseVectorDatabase<FaissConfig> {
     }
 
     const limit = options?.limit || 10
-
     console.log('[FaissDB] 🔍 Hybrid search, requests:', searchRequests.length)
 
-    // FAISS requires topK <= ntotal
-    const ntotal = collection.index.ntotal()
-
-    // Separate dense and sparse search requests
-    const denseResults: Map<string, number> = new Map()
-    const sparseResults: Map<string, number> = new Map()
+    // Process search requests and collect results
+    const denseResults = new Map<string, number>()
+    const sparseResults = new Map<string, number>()
 
     for (const request of searchRequests) {
       if (request.anns_field === 'vector' || request.anns_field === 'dense') {
-        // Dense search
-        if (ntotal === 0) {
-          continue // Skip dense search on empty index
-        }
-
-        const queryVector = request.data as number[]
-        const topK = Math.min(limit * 2, ntotal)
-        const results = collection.index.search(queryVector, topK)
-
-        const documentsArray = Array.from(collection.documents.values())
-        for (let i = 0; i < results.labels.length; i++) {
-          const idx = results.labels[i]
-          const distance = results.distances[i]
-
-          if (idx >= 0 && idx < documentsArray.length) {
-            const doc = documentsArray[idx]
-            const score = 1 / (1 + distance)
-            denseResults.set(doc.id, score)
-          }
-        }
+        this.performDenseSearch(collection, request.data as number[], limit, denseResults)
       }
       else if (request.anns_field === 'sparse' || request.anns_field === 'sparse_vector') {
-        // Sparse search using BM25
-        const queryText = request.data as string
-
-        // Score all documents
-        const documentsArray = Array.from(collection.documents.values())
-        for (const doc of documentsArray) {
-          const sparseVector = collection.bm25.generate(doc.content)
-          const queryVector = collection.bm25.generate(queryText)
-
-          // Calculate dot product of sparse vectors
-          let score = 0
-          const queryMap = new Map<number, number>()
-          for (let i = 0; i < queryVector.indices.length; i++) {
-            queryMap.set(queryVector.indices[i], queryVector.values[i])
-          }
-
-          for (let i = 0; i < sparseVector.indices.length; i++) {
-            const idx = sparseVector.indices[i]
-            const val = sparseVector.values[i]
-            const queryVal = queryMap.get(idx)
-            if (queryVal !== undefined) {
-              score += val * queryVal
-            }
-          }
-
-          if (score > 0) {
-            sparseResults.set(doc.id, score)
-          }
-        }
+        this.performSparseSearch(collection, request.data as string, sparseResults)
       }
     }
 
-    // Apply RRF (Reciprocal Rank Fusion) reranking
-    const rrfResults = this.applyRRF(collectionName, denseResults, sparseResults, options)
+    // Apply RRF reranking
+    const rrfResults = this.applyRRF(collection, denseResults, sparseResults, options)
 
     console.log('[FaissDB] ✅ Hybrid search results:', rrfResults.length)
     return rrfResults.slice(0, limit)
   }
 
   /**
+   * Perform dense vector search using FAISS index
+   */
+  private performDenseSearch(
+    collection: { index: IndexFlatL2, documents: Map<string, DocumentMetadata> },
+    queryVector: number[],
+    limit: number,
+    results: Map<string, number>,
+  ): void {
+    const ntotal = collection.index.ntotal()
+    if (ntotal === 0) return
+
+    const topK = Math.min(limit * 2, ntotal)
+    const searchResults = collection.index.search(queryVector, topK)
+    const documentsArray = Array.from(collection.documents.values())
+
+    for (let i = 0; i < searchResults.labels.length; i++) {
+      const idx = searchResults.labels[i]
+      const distance = searchResults.distances[i]
+
+      if (idx >= 0 && idx < documentsArray.length) {
+        const doc = documentsArray[idx]
+        const score = 1 / (1 + distance)
+        results.set(doc.id, score)
+      }
+    }
+  }
+
+  /**
+   * Perform sparse search using BM25
+   */
+  private performSparseSearch(
+    collection: { bm25?: SimpleBM25, documents: Map<string, DocumentMetadata> },
+    queryText: string,
+    results: Map<string, number>,
+  ): void {
+    if (!collection.bm25) return
+
+    // Generate query vector once (outside the loop)
+    const queryVector = collection.bm25.generate(queryText)
+    const queryMap = new Map<number, number>()
+    for (let i = 0; i < queryVector.indices.length; i++) {
+      queryMap.set(queryVector.indices[i], queryVector.values[i])
+    }
+
+    // Score all documents
+    for (const doc of collection.documents.values()) {
+      const score = this.calculateSparseScore(collection.bm25, doc.content, queryMap)
+      if (score > 0) {
+        results.set(doc.id, score)
+      }
+    }
+  }
+
+  /**
+   * Calculate sparse vector dot product score
+   */
+  private calculateSparseScore(
+    bm25: SimpleBM25,
+    content: string,
+    queryMap: Map<number, number>,
+  ): number {
+    const sparseVector = bm25.generate(content)
+    let score = 0
+
+    for (let i = 0; i < sparseVector.indices.length; i++) {
+      const idx = sparseVector.indices[i]
+      const val = sparseVector.values[i]
+      const queryVal = queryMap.get(idx)
+      if (queryVal !== undefined) {
+        score += val * queryVal
+      }
+    }
+
+    return score
+  }
+
+  /**
+   * Pre-compute ranks from scores (O(n log n) instead of O(n²))
+   */
+  private computeRanks(scores: Map<string, number>): Map<string, number> {
+    const ranks = new Map<string, number>()
+    const sorted = Array.from(scores.entries()).sort((a, b) => b[1] - a[1])
+    sorted.forEach(([id], index) => ranks.set(id, index + 1))
+    return ranks
+  }
+
+  /**
    * Apply Reciprocal Rank Fusion (RRF) reranking
    */
   private applyRRF(
-    collectionName: string,
+    collection: { documents: Map<string, DocumentMetadata> },
     denseResults: Map<string, number>,
     sparseResults: Map<string, number>,
     options?: HybridSearchOptions,
   ): HybridSearchResult[] {
     const k = options?.rerank?.params?.k || 60
-    const collection = this.collections.get(collectionName)
-    if (!collection) {
-      throw new Error(`Collection ${collectionName} not found`)
-    }
 
-    // Combine all document IDs
+    // Pre-compute ranks once (O(n log n) total instead of O(n²))
+    const denseRanks = this.computeRanks(denseResults)
+    const sparseRanks = this.computeRanks(sparseResults)
+
+    // Combine all document IDs and calculate RRF scores
     const allDocIds = new Set([...denseResults.keys(), ...sparseResults.keys()])
-
-    // Calculate RRF scores
-    const rrfScores = new Map<string, number>()
+    const rrfScores: Array<[string, number]> = []
 
     for (const docId of allDocIds) {
       let rrfScore = 0
+      const denseRank = denseRanks.get(docId)
+      const sparseRank = sparseRanks.get(docId)
 
-      // Add dense rank contribution
-      const denseScore = denseResults.get(docId)
-      if (denseScore !== undefined) {
-        // Convert score to rank (higher score = lower rank number)
-        const denseRank = Array.from(denseResults.entries())
-          .sort((a, b) => b[1] - a[1])
-          .findIndex(([id]) => id === docId) + 1
+      if (denseRank !== undefined) {
         rrfScore += 1 / (k + denseRank)
       }
-
-      // Add sparse rank contribution
-      const sparseScore = sparseResults.get(docId)
-      if (sparseScore !== undefined) {
-        const sparseRank = Array.from(sparseResults.entries())
-          .sort((a, b) => b[1] - a[1])
-          .findIndex(([id]) => id === docId) + 1
+      if (sparseRank !== undefined) {
         rrfScore += 1 / (k + sparseRank)
       }
 
-      rrfScores.set(docId, rrfScore)
+      rrfScores.push([docId, rrfScore])
     }
 
     // Sort by RRF score and convert to results
-    const sortedResults = Array.from(rrfScores.entries())
-      .sort((a, b) => b[1] - a[1])
+    rrfScores.sort((a, b) => b[1] - a[1])
 
     const results: HybridSearchResult[] = []
-    for (const [docId, score] of sortedResults) {
+    for (const [docId, score] of rrfScores) {
       const doc = collection.documents.get(docId)
       if (doc) {
         results.push({
@@ -778,7 +823,6 @@ export class FaissVectorDatabase extends BaseVectorDatabase<FaissConfig> {
         })
       }
     }
-
     return results
   }
 
