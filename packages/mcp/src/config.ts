@@ -132,8 +132,8 @@ export function createMcpConfig(): ContextMcpConfig {
     name: envManager.get('MCP_SERVER_NAME') || 'Context MCP Server',
     version: envManager.get('MCP_SERVER_VERSION') || '1.0.0',
     // Embedding provider configuration
-    embeddingProvider: (envManager.get('EMBEDDING_PROVIDER') as 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama' | 'HuggingFace') || 'OpenAI',
-    embeddingModel: getEmbeddingModelForProvider(envManager.get('EMBEDDING_PROVIDER') || 'OpenAI'),
+    embeddingProvider: (envManager.get('EMBEDDING_PROVIDER') as 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama' | 'HuggingFace') || 'HuggingFace',
+    embeddingModel: getEmbeddingModelForProvider(envManager.get('EMBEDDING_PROVIDER') || 'MongoDB/mdbr-leaf-ir'),
     // Provider-specific API keys
     openaiApiKey: envManager.get('OPENAI_API_KEY'),
     openaiBaseUrl: envManager.get('OPENAI_BASE_URL'),
@@ -146,7 +146,7 @@ export function createMcpConfig(): ContextMcpConfig {
     // HuggingFace configuration
     huggingfaceDtype: (envManager.get('HUGGINGFACE_DTYPE') as 'fp32' | 'fp16' | 'q8' | 'q4' | 'q4f16') || undefined,
     // Vector database configuration
-    vectorDbType: (envManager.get('VECTOR_DB_TYPE') as 'milvus' | 'qdrant') || 'milvus',
+    vectorDbType: (envManager.get('VECTOR_DB_TYPE') as 'milvus' | 'qdrant' | 'faiss') || 'faiss',
     milvusAddress: envManager.get('MILVUS_ADDRESS'), // Optional, can be resolved from token
     milvusToken: envManager.get('MILVUS_TOKEN'),
     qdrantUrl: envManager.get('QDRANT_URL'),
