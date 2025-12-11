@@ -4,6 +4,9 @@ import * as path from 'node:path'
 import { Context, HuggingFaceEmbedding, VectorDatabaseFactory } from '@pleaseai/context-please-core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+// Check if FAISS is available before running tests
+const faissAvailable = VectorDatabaseFactory.isFaissAvailable()
+
 /**
  * Integration tests for FAISS + HuggingFace embedding
  *
@@ -14,8 +17,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
  *
  * This test verifies that the HuggingFace truncation fix works correctly
  * when processing code chunks that may exceed the 512 token limit.
+ *
+ * Note: These tests are skipped when FAISS native bindings are not available
+ * (e.g., in CI environments without C++ build tools).
  */
-describe('FAISS + HuggingFace Integration', () => {
+describe.skipIf(!faissAvailable)('FAISS + HuggingFace Integration', () => {
   let context: Context
   let fixturesPath: string
   let tempFaissDir: string
