@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.0](https://github.com/pleaseai/context-please/compare/core-v0.4.0...core-v0.5.0) (2025-12-12)
+
+
+### Features
+
+* add FAISS vector database support for local-only deployments ([#41](https://github.com/pleaseai/context-please/issues/41)) ([d01dba7](https://github.com/pleaseai/context-please/commit/d01dba7b0f73cd3317c7f85f6cf2bb7bbdb3f676))
+* **core:** add HuggingFace Transformers embedding provider with LEAF model support ([#53](https://github.com/pleaseai/context-please/issues/53)) ([75307d5](https://github.com/pleaseai/context-please/commit/75307d5e931fe8329b93568e4669ba6d6ce49cd1))
+
+
+### Bug Fixes
+
+* **mcp:** resolve race condition where search fails immediately after indexing ([#51](https://github.com/pleaseai/context-please/issues/51)) ([f26a59d](https://github.com/pleaseai/context-please/commit/f26a59d0f4ef28b58e7e9fda89baf454809c9528))
+
 ## [0.4.0](https://github.com/chatbot-pf/context-please/compare/core-v0.3.1...core-v0.4.0) (2025-10-31)
 
 
