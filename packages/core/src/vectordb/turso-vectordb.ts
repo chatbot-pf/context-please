@@ -400,10 +400,8 @@ export class TursoVectorDatabase extends BaseVectorDatabase<TursoConfig> {
     // Remove WAL files if they exist
     const walPath = `${dbPath}-wal`
     const shmPath = `${dbPath}-shm`
-    if (await fs.pathExists(walPath))
-      await fs.remove(walPath)
-    if (await fs.pathExists(shmPath))
-      await fs.remove(shmPath)
+    await fs.remove(walPath)
+    await fs.remove(shmPath)
 
     console.log('[TursoDB] Collection dropped:', collectionName)
   }

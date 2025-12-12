@@ -690,8 +690,9 @@ export class FaissVectorDatabase extends BaseVectorDatabase<FaissConfig> {
     results: Map<string, number>,
   ): void {
     const ntotal = collection.index.ntotal()
-    if (ntotal === 0)
+    if (ntotal === 0) {
       return
+    }
 
     const topK = Math.min(limit * 2, ntotal)
     const searchResults = collection.index.search(queryVector, topK)
@@ -717,8 +718,9 @@ export class FaissVectorDatabase extends BaseVectorDatabase<FaissConfig> {
     queryText: string,
     results: Map<string, number>,
   ): void {
-    if (!collection.bm25)
+    if (!collection.bm25) {
       return
+    }
 
     // Generate query vector once (outside the loop)
     const queryVector = collection.bm25.generate(queryText)
