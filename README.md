@@ -32,6 +32,12 @@ Model Context Protocol (MCP) allows you to integrate Claude Context with your fa
 
 ### Prerequisites
 
+**🚀 New: Zero-Config Local Mode with FAISS**
+
+You can now use Context Please with **no external database required**! Simply provide an OpenAI API key, and FAISS will handle local storage automatically. Perfect for getting started quickly or working with small-to-medium codebases.
+
+For production deployments or large codebases, consider using Zilliz Cloud or Qdrant:
+
 <details>
 <summary>Get a free vector database on Zilliz Cloud 👈</summary>
 
@@ -62,7 +68,19 @@ Copy your key and use it in the configuration examples below as `your-openai-api
 
 #### Configuration
 
-Use the command line interface to add the Claude Context MCP server:
+**Option 1: Local Mode with FAISS (Recommended for Getting Started)**
+
+The simplest way to get started - no external database required:
+
+```bash
+claude mcp add context-please \
+  -e OPENAI_API_KEY=sk-your-openai-api-key \
+  -- npx @pleaseai/context-please-mcp@latest
+```
+
+**Option 2: Cloud Mode with Zilliz (For Production/Large Codebases)**
+
+For larger codebases or production deployments:
 
 ```bash
 claude mcp add context-please \
@@ -482,6 +500,71 @@ npx @pleaseai/context-please-mcp@latest
 ### Environment Variables Configuration
 
 For more detailed MCP environment variable configuration, see our [Environment Variables Guide](docs/getting-started/environment-variables.md).
+
+### Using FAISS for Local-Only Deployments
+
+**Context Please** now supports FAISS as a zero-configuration, local-only vector database option! This is perfect for:
+
+- 🚀 **Quick Start**: No external database setup required
+- 💻 **Local Development**: All data stays on your machine
+- 💰 **Zero Cost**: No cloud services or infrastructure costs
+- 📦 **Small-to-Medium Codebases**: Ideal for personal projects and teams
+
+#### Quick Start with FAISS
+
+Simply omit the Milvus/Qdrant configuration, and Context Please will automatically use FAISS:
+
+```bash
+claude mcp add context-please \
+  -e OPENAI_API_KEY=sk-your-openai-api-key \
+  -- npx @pleaseai/context-please-mcp@latest
+```
+
+That's it! Your code will be indexed to `~/.context/faiss-indexes/` automatically.
+
+#### Advanced FAISS Configuration
+
+You can customize the storage directory:
+
+```bash
+claude mcp add context-please \
+  -e OPENAI_API_KEY=sk-your-openai-api-key \
+  -e FAISS_STORAGE_DIR=/path/to/your/indexes \
+  -- npx @pleaseai/context-please-mcp@latest
+```
+
+Or explicitly specify FAISS as the vector database:
+
+```json
+{
+  "mcpServers": {
+    "context-please": {
+      "command": "npx",
+      "args": ["@pleaseai/context-please-mcp@latest"],
+      "env": {
+        "OPENAI_API_KEY": "your-openai-api-key",
+        "VECTOR_DB_TYPE": "faiss-local",
+        "FAISS_STORAGE_DIR": "~/.context/faiss-indexes"
+      }
+    }
+  }
+}
+```
+
+#### FAISS Features
+
+- ✅ **Hybrid Search**: Combines dense (semantic) + sparse (BM25) vectors
+- ✅ **File-based Persistence**: Indexes saved as `.index` files
+- ✅ **Auto-selection**: Defaults to FAISS when no external DB configured
+- ✅ **Same Interface**: Compatible with all existing tools and APIs
+
+#### Limitations
+
+- ⚠️ **Memory**: Entire index loads into RAM (suitable for ~100K files)
+- ⚠️ **Concurrency**: Single-process file access
+- ⚠️ **Scalability**: For larger codebases, consider Milvus or Qdrant
+
+For production deployments or large codebases (>100K files), we recommend using [Milvus](https://milvus.io) or [Qdrant](https://qdrant.tech).
 
 ### Using Different Embedding Models
 

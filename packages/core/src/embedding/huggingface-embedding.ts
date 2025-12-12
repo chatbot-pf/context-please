@@ -164,8 +164,12 @@ export class HuggingFaceEmbedding extends Embedding {
     const prefixedText = this.applyQueryPrefix(processedText)
 
     try {
-      // Tokenize
-      const inputs = await this.tokenizer([prefixedText], { padding: true })
+      // Tokenize with truncation to handle texts longer than maxTokens
+      const inputs = await this.tokenizer([prefixedText], {
+        padding: true,
+        truncation: true,
+        max_length: this.maxTokens,
+      })
 
       // Get embeddings
       const outputs = await this.model(inputs)
@@ -206,8 +210,12 @@ export class HuggingFaceEmbedding extends Embedding {
     const prefixedTexts = processedTexts.map(text => this.applyQueryPrefix(text))
 
     try {
-      // Tokenize batch
-      const inputs = await this.tokenizer(prefixedTexts, { padding: true })
+      // Tokenize batch with truncation to handle texts longer than maxTokens
+      const inputs = await this.tokenizer(prefixedTexts, {
+        padding: true,
+        truncation: true,
+        max_length: this.maxTokens,
+      })
 
       // Get embeddings
       const outputs = await this.model(inputs)
