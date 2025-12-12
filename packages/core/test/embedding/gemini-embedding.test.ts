@@ -243,9 +243,9 @@ describe('geminiEmbedding', () => {
 
       let attemptCount = 0
       const delays: number[] = []
-      const originalSetTimeout = global.setTimeout
+      const originalSetTimeout = globalThis.setTimeout
 
-      vi.spyOn(global, 'setTimeout').mockImplementation((callback: any, delay: number) => {
+      vi.spyOn(globalThis, 'setTimeout').mockImplementation((callback: any, delay: number) => {
         delays.push(delay)
         return originalSetTimeout(callback, 0) as any
       })
@@ -284,10 +284,7 @@ describe('geminiEmbedding', () => {
         callCount++
         // First call (batch) fails with non-retryable error
         if (callCount === 1) {
-          return Promise.reject({
-            status: 400,
-            message: 'Batch processing failed',
-          })
+          return Promise.reject(new Error('Batch processing failed'))
         }
         // Subsequent calls (individual) succeed
         return Promise.resolve({
@@ -308,10 +305,7 @@ describe('geminiEmbedding', () => {
         callCount++
         // First call (batch) fails with non-retryable error
         if (callCount === 1) {
-          return Promise.reject({
-            status: 400,
-            message: 'Batch processing failed',
-          })
+          return Promise.reject(new Error('Batch processing failed'))
         }
         // Subsequent individual calls succeed with different values
         return Promise.resolve({

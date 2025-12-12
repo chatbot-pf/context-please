@@ -520,16 +520,16 @@ export class ToolHandlers {
             return {
               content: [{
                 type: 'text',
-                text: `Error: Collection exists for '${absolutePath}' but statistics could not be retrieved from the vector database.\n\n` +
-                      `This may indicate:\n` +
-                      `  - Collection is not loaded or in an invalid state\n` +
-                      `  - Vector database connectivity issues\n` +
-                      `\n` +
-                      `Recommended actions:\n` +
-                      `  1. Try searching again in a moment\n` +
-                      `  2. If the problem persists, re-index the codebase:\n` +
-                      `     index_codebase(path='${absolutePath}', force=true)\n` +
-                      `  3. Check your vector database connection settings`,
+                text: `Error: Collection exists for '${absolutePath}' but statistics could not be retrieved from the vector database.\n\n`
+                  + `This may indicate:\n`
+                  + `  - Collection is not loaded or in an invalid state\n`
+                  + `  - Vector database connectivity issues\n`
+                  + `\n`
+                  + `Recommended actions:\n`
+                  + `  1. Try searching again in a moment\n`
+                  + `  2. If the problem persists, re-index the codebase:\n`
+                  + `     index_codebase(path='${absolutePath}', force=true)\n`
+                  + `  3. Check your vector database connection settings`,
               }],
               isError: true,
             }
@@ -542,18 +542,18 @@ export class ToolHandlers {
           return {
             content: [{
               type: 'text',
-              text: `Error: Failed to sync codebase '${absolutePath}' from vector database.\n\n` +
-                    `Error: ${error instanceof Error ? error.message : String(error)}\n\n` +
-                    `This may indicate:\n` +
-                    `  - Network connectivity issues with the vector database\n` +
-                    `  - Authentication or permission problems\n` +
-                    `  - Vector database service unavailable\n` +
-                    `\n` +
-                    `Recommended actions:\n` +
-                    `  1. Check your MILVUS_ADDRESS and MILVUS_TOKEN settings\n` +
-                    `  2. Verify network connectivity to the database\n` +
-                    `  3. Check the logs above for detailed error information\n` +
-                    `  4. Try re-indexing: index_codebase(path='${absolutePath}', force=true)`,
+              text: `Error: Failed to sync codebase '${absolutePath}' from vector database.\n\n`
+                + `Error: ${error instanceof Error ? error.message : String(error)}\n\n`
+                + `This may indicate:\n`
+                + `  - Network connectivity issues with the vector database\n`
+                + `  - Authentication or permission problems\n`
+                + `  - Vector database service unavailable\n`
+                + `\n`
+                + `Recommended actions:\n`
+                + `  1. Check your MILVUS_ADDRESS and MILVUS_TOKEN settings\n`
+                + `  2. Verify network connectivity to the database\n`
+                + `  3. Check the logs above for detailed error information\n`
+                + `  4. Try re-indexing: index_codebase(path='${absolutePath}', force=true)`,
             }],
             isError: true,
           }
