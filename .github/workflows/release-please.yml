@@ -12,6 +12,10 @@ name: release-please
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    outputs:
+      releases_created: ${{ steps.release.outputs.releases_created }}
+      core_released: ${{ steps.release.outputs['packages/core--release_created'] }}
+      mcp_released: ${{ steps.release.outputs['packages/mcp--release_created'] }}
     steps:
       - uses: actions/create-github-app-token@v2
         id: app-token
@@ -19,7 +23,46 @@ jobs:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.PRIVATE_KEY }}
       - uses: googleapis/release-please-action@v4
+        id: release
         with:
           token: ${{ steps.app-token.outputs.token }}
           config-file: 'release-please-config.json'
           manifest-file: '.release-please-manifest.json'
+
+  publish:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.releases_created == 'true' }}
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Publish core package to npm
+        if: ${{ needs.release-please.outputs.core_released == 'true' }}
+        run: pnpm --filter @pleaseai/context-please-core publish --provenance --access public --no-git-checks
+
+      - name: Publish mcp package to npm
+        if: ${{ needs.release-please.outputs.mcp_released == 'true' }}
+        run: pnpm --filter @pleaseai/context-please-mcp publish --provenance --access public --no-git-checks
