@@ -21,7 +21,7 @@ vi.mock('@huggingface/transformers', () => {
   }
 })
 
-describe('HuggingFaceEmbedding', () => {
+describe('huggingFaceEmbedding', () => {
   let embedding: HuggingFaceEmbedding
 
   beforeEach(() => {
@@ -39,7 +39,7 @@ describe('HuggingFaceEmbedding', () => {
 
     mockModel.mockResolvedValue({
       sentence_embedding: {
-        tolist: () => [[...new Array(768).fill(0.1)]],
+        tolist: () => [[...Array.from({ length: 768 }).fill(0.1)]],
       },
     })
 
@@ -151,9 +151,9 @@ describe('HuggingFaceEmbedding', () => {
       mockModel.mockResolvedValue({
         sentence_embedding: {
           tolist: () => [
-            [...new Array(768).fill(0.1)],
-            [...new Array(768).fill(0.2)],
-            [...new Array(768).fill(0.3)],
+            [...Array.from({ length: 768 }).fill(0.1)],
+            [...Array.from({ length: 768 }).fill(0.2)],
+            [...Array.from({ length: 768 }).fill(0.3)],
           ],
         },
       })
@@ -209,8 +209,8 @@ describe('HuggingFaceEmbedding', () => {
       mockModel.mockResolvedValue({
         sentence_embedding: {
           tolist: () => [
-            [...new Array(768).fill(0.1)],
-            [...new Array(768).fill(0.2)],
+            [...Array.from({ length: 768 }).fill(0.1)],
+            [...Array.from({ length: 768 }).fill(0.2)],
           ],
         },
       })
@@ -290,7 +290,7 @@ describe('HuggingFaceEmbedding', () => {
         // Individual calls succeed
         return Promise.resolve({
           sentence_embedding: {
-            tolist: () => [[...new Array(768).fill(0.1)]],
+            tolist: () => [[...Array.from({ length: 768 }).fill(0.1)]],
           },
         })
       })
@@ -408,7 +408,7 @@ describe('HuggingFaceEmbedding', () => {
       const results = await Promise.all(promises)
 
       expect(results).toHaveLength(3)
-      expect(results.every(r => r.vector.length === 768)).toBe(true)
+      expect(results.every((r) => r.vector.length === 768)).toBe(true)
     })
 
     it('should load model only once for concurrent initial calls', async () => {

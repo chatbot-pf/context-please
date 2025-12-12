@@ -92,7 +92,7 @@ export class GeminiEmbedding extends Embedding {
       'connection',
     ]
 
-    return retryablePatterns.some(pattern => errorMessage.includes(pattern))
+    return retryablePatterns.some((pattern) => errorMessage.includes(pattern))
   }
 
   /**
@@ -100,7 +100,7 @@ export class GeminiEmbedding extends Embedding {
    * @param ms Milliseconds to sleep
    */
   private async sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms))
+    return new Promise((resolve) => setTimeout(resolve, ms))
   }
 
   /**
@@ -138,7 +138,7 @@ export class GeminiEmbedding extends Embedding {
         }
 
         // Calculate delay with exponential backoff (capped at 10s)
-        const delay = Math.min(this.baseDelay * Math.pow(2, attempt), 10000)
+        const delay = Math.min(this.baseDelay * 2 ** attempt, 10000)
         await this.sleep(delay)
       }
     }
@@ -219,7 +219,7 @@ export class GeminiEmbedding extends Embedding {
         try {
           // Add delay between requests (except for first)
           if (i > 0) {
-            await new Promise(resolve => setTimeout(resolve, FALLBACK_DELAY_MS))
+            await new Promise((resolve) => setTimeout(resolve, FALLBACK_DELAY_MS))
           }
 
           const result = await this.embed(text)

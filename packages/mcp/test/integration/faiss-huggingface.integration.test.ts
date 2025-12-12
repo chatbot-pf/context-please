@@ -21,7 +21,7 @@ const faissAvailable = VectorDatabaseFactory.isFaissAvailable()
  * Note: These tests are skipped when FAISS native bindings are not available
  * (e.g., in CI environments without C++ build tools).
  */
-describe.skipIf(!faissAvailable)('FAISS + HuggingFace Integration', () => {
+describe.skipIf(!faissAvailable)('fAISS + HuggingFace Integration', () => {
   let context: Context
   let fixturesPath: string
   let tempFaissDir: string

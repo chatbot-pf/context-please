@@ -11,6 +11,7 @@ import { FaissVectorDatabase } from '../../src/vectordb/faiss-vectordb'
 import { MilvusRestfulVectorDatabase } from '../../src/vectordb/milvus-restful-vectordb'
 import { MilvusVectorDatabase } from '../../src/vectordb/milvus-vectordb'
 import { QdrantVectorDatabase } from '../../src/vectordb/qdrant-vectordb'
+import { TursoVectorDatabase } from '../../src/vectordb/turso-vectordb'
 
 describe('vectorDatabaseFactory', () => {
   describe('create', () => {
@@ -79,6 +80,23 @@ describe('vectorDatabaseFactory', () => {
       expect(db).toHaveProperty('hybridSearch')
     })
 
+    it('should create TursoVectorDatabase with TURSO_LOCAL type', () => {
+      const db = VectorDatabaseFactory.create(
+        VectorDatabaseType.TURSO_LOCAL,
+        {
+          storageDir: '/tmp/turso-test',
+        },
+      )
+
+      expect(db).toBeInstanceOf(TursoVectorDatabase)
+      expect(db).toHaveProperty('createCollection')
+      expect(db).toHaveProperty('createHybridCollection')
+      expect(db).toHaveProperty('search')
+      expect(db).toHaveProperty('hybridSearch')
+      expect(db).toHaveProperty('delete')
+      expect(db).toHaveProperty('query')
+    })
+
     it('should pass correct config to MilvusVectorDatabase', () => {
       const config = {
         address: 'localhost:19530',
@@ -127,7 +145,10 @@ describe('vectorDatabaseFactory', () => {
       expect(types).toContain(VectorDatabaseType.MILVUS_GRPC)
       expect(types).toContain(VectorDatabaseType.MILVUS_RESTFUL)
       expect(types).toContain(VectorDatabaseType.QDRANT_GRPC)
-      expect(types.length).toBe(3)
+      expect(types).toContain(VectorDatabaseType.TURSO_LOCAL)
+      // Note: FAISS may or may not be available depending on native bindings
+      // So we check for at least 4 types (without FAISS)
+      expect(types.length).toBeGreaterThanOrEqual(4)
     })
 
     it('should return array of VectorDatabaseType', () => {
@@ -151,6 +172,10 @@ describe('vectorDatabaseFactory', () => {
 
     it('should have QDRANT_GRPC type', () => {
       expect(VectorDatabaseType.QDRANT_GRPC).toBe('qdrant-grpc')
+    })
+
+    it('should have TURSO_LOCAL type', () => {
+      expect(VectorDatabaseType.TURSO_LOCAL).toBe('turso-local')
     })
   })
 

@@ -25,7 +25,7 @@ vi.mock('node:fs', () => ({
   mkdirSync: vi.fn(),
 }))
 
-describe('SnapshotManager Race Condition Fix', () => {
+describe('snapshotManager Race Condition Fix', () => {
   let snapshotManager: SnapshotManager
 
   beforeEach(() => {
@@ -234,7 +234,7 @@ describe('SnapshotManager Race Condition Fix', () => {
     })
   })
 
-  describe('State Transition Flow', () => {
+  describe('state Transition Flow', () => {
     it('should correctly transition from indexing → indexed', () => {
       // This simulates the real flow in startBackgroundIndexing()
       const codebasePath = '/test/project'
