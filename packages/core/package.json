@@ -1,6 +1,6 @@
 {
   "name": "@pleaseai/context-please-core",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Core indexing engine for Context Please (fork of claude-context-core)",
   "license": "MIT",
   "repository": {
