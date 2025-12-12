@@ -61,8 +61,10 @@ jobs:
 
       - name: Publish core package to npm
         if: ${{ needs.release-please.outputs.core_released == 'true' }}
-        run: pnpm --filter @pleaseai/context-please-core publish --provenance --access public --no-git-checks
+        working-directory: packages/core
+        run: npm publish --provenance --access public
 
       - name: Publish mcp package to npm
         if: ${{ needs.release-please.outputs.mcp_released == 'true' }}
-        run: pnpm --filter @pleaseai/context-please-mcp publish --provenance --access public --no-git-checks
+        working-directory: packages/mcp
+        run: npm publish --provenance --access public
