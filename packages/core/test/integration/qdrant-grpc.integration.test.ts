@@ -64,19 +64,16 @@ describe.skipIf(!process.env.QDRANT_URL)('qdrant gRPC Client Integration', () =>
 
   describe('collection Operations', () => {
     it('should list collections using gRPC API', async () => {
-
       const collections = await qdrantDb.listCollections()
       expect(Array.isArray(collections)).toBe(true)
     })
 
     it('should check if collection exists using gRPC API', async () => {
-
       const exists = await qdrantDb.hasCollection(testCollectionName)
       expect(exists).toBe(false)
     })
 
     it('should create and drop collection using gRPC API', async () => {
-
       // Create collection
       await qdrantDb.createHybridCollection(testCollectionName, 1536)
 
@@ -99,7 +96,6 @@ describe.skipIf(!process.env.QDRANT_URL)('qdrant gRPC Client Integration', () =>
 
   describe('document Insertion with Protobuf Structure', () => {
     it('should insert documents with metadata using gRPC protobuf format', async () => {
-
       // Create collection
       await qdrantDb.createHybridCollection(testCollectionName, 1536)
 
@@ -137,7 +133,6 @@ describe.skipIf(!process.env.QDRANT_URL)('qdrant gRPC Client Integration', () =>
 
   describe('query with Metadata Extraction', () => {
     beforeEach(async () => {
-
       // Setup: Create collection and insert test data
       await qdrantDb.createHybridCollection(testCollectionName, 1536)
 
@@ -197,7 +192,6 @@ describe.skipIf(!process.env.QDRANT_URL)('qdrant gRPC Client Integration', () =>
     })
 
     it('should query and extract metadata.codebasePath correctly', async () => {
-
       // Query with metadata field
       const results = await qdrantDb.query(
         testCollectionName,
@@ -221,7 +215,6 @@ describe.skipIf(!process.env.QDRANT_URL)('qdrant gRPC Client Integration', () =>
     })
 
     it('should handle protobuf kind.case pattern for string values', async () => {
-
       const results = await qdrantDb.query(
         testCollectionName,
         '',
@@ -245,7 +238,6 @@ describe.skipIf(!process.env.QDRANT_URL)('qdrant gRPC Client Integration', () =>
     })
 
     it('should handle protobuf kind.case pattern for integer values', async () => {
-
       const results = await qdrantDb.query(
         testCollectionName,
         '',
@@ -265,7 +257,6 @@ describe.skipIf(!process.env.QDRANT_URL)('qdrant gRPC Client Integration', () =>
     })
 
     it('should return all fields when outputFields is empty', async () => {
-
       const results = await qdrantDb.query(
         testCollectionName,
         '',
@@ -288,7 +279,6 @@ describe.skipIf(!process.env.QDRANT_URL)('qdrant gRPC Client Integration', () =>
     })
 
     it('should filter by fileExtension correctly', async () => {
-
       // Query with filter
       const results = await qdrantDb.query(
         testCollectionName,
@@ -306,7 +296,6 @@ describe.skipIf(!process.env.QDRANT_URL)('qdrant gRPC Client Integration', () =>
     })
 
     it('should handle empty collections gracefully', async () => {
-
       // Create empty collection
       const emptyCollection = 'test_empty_collection'
       await qdrantDb.createHybridCollection(emptyCollection, 1536)
@@ -328,7 +317,6 @@ describe.skipIf(!process.env.QDRANT_URL)('qdrant gRPC Client Integration', () =>
 
   describe('protobuf Backward Compatibility', () => {
     it('should handle both kind.value and direct value access patterns', async () => {
-
       await qdrantDb.createHybridCollection(testCollectionName, 1536)
 
       const bm25 = qdrantDb.getBM25Generator()
@@ -367,7 +355,6 @@ describe.skipIf(!process.env.QDRANT_URL)('qdrant gRPC Client Integration', () =>
 
   describe('sync Integration', () => {
     it('should allow sync to extract codebasePath from Qdrant collections', async () => {
-
       await qdrantDb.createHybridCollection(testCollectionName, 1536)
 
       const bm25 = qdrantDb.getBM25Generator()
@@ -409,7 +396,6 @@ describe.skipIf(!process.env.QDRANT_URL)('qdrant gRPC Client Integration', () =>
 
   describe('hybrid Search with BM25', () => {
     beforeEach(async () => {
-
       // Create collection with hybrid vectors
       await qdrantDb.createHybridCollection(testCollectionName, 384) // Small dimension for test
 
@@ -457,7 +443,6 @@ describe.skipIf(!process.env.QDRANT_URL)('qdrant gRPC Client Integration', () =>
     })
 
     it('should perform hybrid search successfully', async () => {
-
       // Act - Perform hybrid search
       const query = 'get_resolver function'
       const denseVector = Array.from({ length: 384 }).fill(0.15)
@@ -486,7 +471,6 @@ describe.skipIf(!process.env.QDRANT_URL)('qdrant gRPC Client Integration', () =>
     })
 
     it('should handle query with empty sparse vector gracefully', async () => {
-
       // Act - Query with term not in vocabulary (should generate empty sparse vector)
       const query = 'nonexistent_unknown_term_xyz'
       const denseVector = Array.from({ length: 384 }).fill(0.15)
@@ -509,7 +493,6 @@ describe.skipIf(!process.env.QDRANT_URL)('qdrant gRPC Client Integration', () =>
     })
 
     it('should handle BM25 model persistence across searches', async () => {
-
       // First search - BM25 should be trained
       const query1 = 'get_resolver'
       const denseVector1 = Array.from({ length: 384 }).fill(0.1)

@@ -207,7 +207,7 @@ export class HuggingFaceEmbedding extends Embedding {
     }
 
     const processedTexts = this.preprocessTexts(texts)
-    const prefixedTexts = processedTexts.map(text => this.applyQueryPrefix(text))
+    const prefixedTexts = processedTexts.map((text) => this.applyQueryPrefix(text))
 
     try {
       // Tokenize batch with truncation to handle texts longer than maxTokens
@@ -228,7 +228,7 @@ export class HuggingFaceEmbedding extends Embedding {
       // Convert tensor to array
       const embeddings = outputs.sentence_embedding.tolist() as number[][]
 
-      return embeddings.map(embedding => ({
+      return embeddings.map((embedding) => ({
         vector: embedding,
         dimension: embedding.length,
       }))
@@ -239,7 +239,7 @@ export class HuggingFaceEmbedding extends Embedding {
       console.warn(`[HuggingFace] Batch embedding failed: ${batchErrorMessage}, falling back to parallel individual processing`)
 
       try {
-        return await Promise.all(texts.map(text => this.embed(text)))
+        return await Promise.all(texts.map((text) => this.embed(text)))
       }
       catch (individualError) {
         const err = new Error(`HuggingFace batch embedding failed (both batch and individual attempts failed): ${batchErrorMessage}`)
