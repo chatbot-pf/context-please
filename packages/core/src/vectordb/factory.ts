@@ -2,12 +2,12 @@ import type { FaissConfig } from './faiss-vectordb'
 import type { MilvusRestfulConfig } from './milvus-restful-vectordb'
 import type { MilvusConfig } from './milvus-vectordb'
 import type { QdrantConfig } from './qdrant-vectordb'
-import type { TursoConfig } from './turso-vectordb'
+import type { LibSQLConfig } from './libsql-vectordb'
 import type { VectorDatabase } from './types'
 import { MilvusRestfulVectorDatabase } from './milvus-restful-vectordb'
 import { MilvusVectorDatabase } from './milvus-vectordb'
 import { QdrantVectorDatabase } from './qdrant-vectordb'
-import { TursoVectorDatabase } from './turso-vectordb'
+import { LibSQLVectorDatabase } from './libsql-vectordb'
 
 // FAISS is optional - may not be available in all environments (e.g., CI without native bindings)
 // Use lazy loading to avoid import errors
@@ -83,11 +83,11 @@ export enum VectorDatabaseType {
   FAISS_LOCAL = 'faiss-local',
 
   /**
-   * Turso (libSQL) local file-based vector database
+   * LibSQL local file-based vector database
    * Use for local-only deployments without native bindings
    * Advantages over FAISS: supports deletion, filtering, pure JS
    */
-  TURSO_LOCAL = 'turso-local',
+  LIBSQL_LOCAL = 'libsql-local',
 }
 
 /**
@@ -98,7 +98,7 @@ export interface VectorDatabaseConfig {
   [VectorDatabaseType.MILVUS_RESTFUL]: MilvusRestfulConfig
   [VectorDatabaseType.QDRANT_GRPC]: QdrantConfig
   [VectorDatabaseType.FAISS_LOCAL]: FaissConfig
-  [VectorDatabaseType.TURSO_LOCAL]: TursoConfig
+  [VectorDatabaseType.LIBSQL_LOCAL]: LibSQLConfig
 }
 
 /**
@@ -146,10 +146,10 @@ export class VectorDatabaseFactory {
    *     { storageDir: '~/.context/faiss-indexes' }
    * );
    *
-   * // Create Turso local database
-   * const tursoDB = VectorDatabaseFactory.create(
-   *     VectorDatabaseType.TURSO_LOCAL,
-   *     { storageDir: '~/.context/turso-indexes' }
+   * // Create LibSQL local database
+   * const libsqlDB = VectorDatabaseFactory.create(
+   *     VectorDatabaseType.LIBSQL_LOCAL,
+   *     { storageDir: '~/.context/libsql-indexes' }
    * );
    * ```
    */
@@ -172,13 +172,13 @@ export class VectorDatabaseFactory {
           throw new Error(
             `FAISS vector database is not available. ${faissCheckError || 'Native bindings could not be loaded'}. `
             + 'This usually happens in environments without C++ build tools. '
-            + 'Please use another vector database type (MILVUS_GRPC, MILVUS_RESTFUL, QDRANT_GRPC, or TURSO_LOCAL).',
+            + 'Please use another vector database type (MILVUS_GRPC, MILVUS_RESTFUL, QDRANT_GRPC, or LIBSQL_LOCAL).',
           )
         }
         return new FaissVectorDatabase(config as FaissConfig)
 
-      case VectorDatabaseType.TURSO_LOCAL:
-        return new TursoVectorDatabase(config as TursoConfig)
+      case VectorDatabaseType.LIBSQL_LOCAL:
+        return new LibSQLVectorDatabase(config as LibSQLConfig)
 
       default:
         throw new Error(`Unsupported database type: ${type}`)

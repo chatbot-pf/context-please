@@ -3,15 +3,15 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import * as fs from 'fs-extra'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { TursoVectorDatabase } from '../../src/vectordb/turso-vectordb'
+import { LibSQLVectorDatabase } from '../../src/vectordb/libsql-vectordb'
 
-describe('tursoVectorDatabase', () => {
-  let tursoDB: TursoVectorDatabase
+describe('libSQLVectorDatabase', () => {
+  let libsqlDB: LibSQLVectorDatabase
   let tempDir: string
 
   beforeEach(async () => {
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'turso-test-'))
-    tursoDB = new TursoVectorDatabase({ storageDir: tempDir })
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'libsql-test-'))
+    libsqlDB = new LibSQLVectorDatabase({ storageDir: tempDir })
   })
 
   afterEach(async () => {
@@ -20,36 +20,36 @@ describe('tursoVectorDatabase', () => {
 
   describe('initialization', () => {
     it('should initialize storage directory', async () => {
-      await (tursoDB as any).initialize()
+      await (libsqlDB as any).initialize()
       expect(await fs.pathExists(tempDir)).toBe(true)
     })
 
     it('should throw error with invalid storage directory permissions', async () => {
-      const readOnlyDb = new TursoVectorDatabase({ storageDir: '/root/turso-test-readonly' })
+      const readOnlyDb = new LibSQLVectorDatabase({ storageDir: '/root/libsql-test-readonly' })
       await expect((readOnlyDb as any).initializationPromise).rejects.toThrow(/Failed to initialize/)
     })
   })
 
   describe('createCollection', () => {
     it('should create a dense-only collection', async () => {
-      await tursoDB.createCollection('test', 128)
+      await libsqlDB.createCollection('test', 128)
 
-      expect(await tursoDB.hasCollection('test')).toBe(true)
-      const collections = await tursoDB.listCollections()
+      expect(await libsqlDB.hasCollection('test')).toBe(true)
+      const collections = await libsqlDB.listCollections()
       expect(collections).toContain('test')
     })
 
     it('should create a hybrid collection with BM25', async () => {
-      await tursoDB.createHybridCollection('hybrid-test', 128)
+      await libsqlDB.createHybridCollection('hybrid-test', 128)
 
-      expect(await tursoDB.hasCollection('hybrid-test')).toBe(true)
-      const collections = await tursoDB.listCollections()
+      expect(await libsqlDB.hasCollection('hybrid-test')).toBe(true)
+      const collections = await libsqlDB.listCollections()
       expect(collections).toContain('hybrid-test')
     })
 
     it('should throw error when creating duplicate collection', async () => {
-      await tursoDB.createCollection('test', 128)
-      await expect(tursoDB.createCollection('test', 128)).rejects.toThrow(/already exists/)
+      await libsqlDB.createCollection('test', 128)
+      await expect(libsqlDB.createCollection('test', 128)).rejects.toThrow(/already exists/)
     })
   })
 
@@ -78,11 +78,11 @@ describe('tursoVectorDatabase', () => {
     ]
 
     it('should insert and search documents', async () => {
-      await tursoDB.createCollection('test', 128)
-      await tursoDB.insert('test', testDocs)
+      await libsqlDB.createCollection('test', 128)
+      await libsqlDB.insert('test', testDocs)
 
       const queryVector = Array.from({ length: 128 }).fill(0).map((_, i) => i === 0 ? 1.0 : 0.0)
-      const results = await tursoDB.search('test', queryVector, { topK: 5 })
+      const results = await libsqlDB.search('test', queryVector, { topK: 5 })
 
       expect(results).toHaveLength(2)
       expect(results[0].document.id).toBe('doc1')
@@ -90,16 +90,16 @@ describe('tursoVectorDatabase', () => {
     })
 
     it('should return empty array for empty collection', async () => {
-      await tursoDB.createCollection('empty', 128)
+      await libsqlDB.createCollection('empty', 128)
       const queryVector = Array.from({ length: 128 }).fill(0.1)
-      const results = await tursoDB.search('empty', queryVector)
+      const results = await libsqlDB.search('empty', queryVector)
 
       expect(results).toEqual([])
       expect(results).toBeInstanceOf(Array)
     })
 
     it('should handle dimension mismatch gracefully', async () => {
-      await tursoDB.createCollection('test', 128)
+      await libsqlDB.createCollection('test', 128)
 
       const wrongDimDoc: VectorDocument = {
         id: 'wrong',
@@ -112,15 +112,15 @@ describe('tursoVectorDatabase', () => {
         metadata: {},
       }
 
-      await expect(tursoDB.insert('test', [wrongDimDoc])).rejects.toThrow(/dimension mismatch/)
+      await expect(libsqlDB.insert('test', [wrongDimDoc])).rejects.toThrow(/dimension mismatch/)
     })
 
     it('should apply score threshold filter', async () => {
-      await tursoDB.createCollection('test', 128)
-      await tursoDB.insert('test', testDocs)
+      await libsqlDB.createCollection('test', 128)
+      await libsqlDB.insert('test', testDocs)
 
       const queryVector = Array.from({ length: 128 }).fill(0).map((_, i) => i === 0 ? 1.0 : 0.0)
-      const results = await tursoDB.search('test', queryVector, { topK: 5, threshold: 0.9 })
+      const results = await libsqlDB.search('test', queryVector, { topK: 5, threshold: 0.9 })
 
       // Should filter out low-score documents
       expect(results.length).toBeLessThanOrEqual(2)
@@ -144,19 +144,19 @@ describe('tursoVectorDatabase', () => {
 
     it('should persist and reload collection', async () => {
       // Create and save
-      await tursoDB.createCollection('persist', 128)
-      await tursoDB.insert('persist', [testDoc])
+      await libsqlDB.createCollection('persist', 128)
+      await libsqlDB.insert('persist', [testDoc])
 
       // Force unload from memory
-      const client = (tursoDB as any).clients.get('persist')
+      const client = (libsqlDB as any).clients.get('persist')
       if (client)
         client.close()
-      ;(tursoDB as any).clients.delete('persist')
-      ;(tursoDB as any).metadataCache.delete('persist')
+      ;(libsqlDB as any).clients.delete('persist')
+      ;(libsqlDB as any).metadataCache.delete('persist')
 
       // Reload
       const queryVector = Array.from({ length: 128 }).fill(0.1)
-      const results = await tursoDB.search('persist', queryVector)
+      const results = await libsqlDB.search('persist', queryVector)
 
       expect(results).toHaveLength(1)
       expect(results[0].document.id).toBe('persist-test')
@@ -165,7 +165,7 @@ describe('tursoVectorDatabase', () => {
     it('should throw error when searching non-existent collection', async () => {
       const queryVector = Array.from({ length: 128 }).fill(0.1)
 
-      await expect(tursoDB.search('non-existent', queryVector))
+      await expect(libsqlDB.search('non-existent', queryVector))
         .rejects
         .toThrow(/does not exist/)
     })
@@ -173,7 +173,7 @@ describe('tursoVectorDatabase', () => {
 
   describe('hybrid search', () => {
     it('should perform hybrid search with BM25', async () => {
-      await tursoDB.createHybridCollection('hybrid', 128)
+      await libsqlDB.createHybridCollection('hybrid', 128)
 
       const docs: VectorDocument[] = [
         {
@@ -198,9 +198,9 @@ describe('tursoVectorDatabase', () => {
         },
       ]
 
-      await tursoDB.insertHybrid('hybrid', docs)
+      await libsqlDB.insertHybrid('hybrid', docs)
 
-      const results = await tursoDB.hybridSearch('hybrid', [
+      const results = await libsqlDB.hybridSearch('hybrid', [
         { anns_field: 'dense', data: Array.from({ length: 128 }).fill(0).map((_, i) => i === 0 ? 1.0 : 0.0), param: {}, limit: 10 },
         { anns_field: 'sparse', data: 'machine learning', param: {}, limit: 10 },
       ])
@@ -210,7 +210,7 @@ describe('tursoVectorDatabase', () => {
     })
 
     it('should throw error when calling insertHybrid on dense-only collection', async () => {
-      await tursoDB.createCollection('dense-only', 128)
+      await libsqlDB.createCollection('dense-only', 128)
 
       const docs: VectorDocument[] = [{
         id: 'test',
@@ -223,15 +223,15 @@ describe('tursoVectorDatabase', () => {
         metadata: {},
       }]
 
-      await expect(tursoDB.insertHybrid('dense-only', docs))
+      await expect(libsqlDB.insertHybrid('dense-only', docs))
         .rejects
         .toThrow(/is not a hybrid collection/)
     })
 
     it('should throw error when calling hybridSearch on dense-only collection', async () => {
-      await tursoDB.createCollection('dense-only', 128)
+      await libsqlDB.createCollection('dense-only', 128)
 
-      await expect(tursoDB.hybridSearch('dense-only', [
+      await expect(libsqlDB.hybridSearch('dense-only', [
         { anns_field: 'dense', data: Array.from({ length: 128 }).fill(0.1), param: {}, limit: 10 },
       ])).rejects.toThrow(/is not a hybrid collection/)
     })
@@ -239,7 +239,7 @@ describe('tursoVectorDatabase', () => {
 
   describe('delete operation (key advantage over FAISS)', () => {
     it('should delete documents by ID', async () => {
-      await tursoDB.createCollection('test', 128)
+      await libsqlDB.createCollection('test', 128)
       const docs: VectorDocument[] = [
         {
           id: 'delete-me',
@@ -262,23 +262,23 @@ describe('tursoVectorDatabase', () => {
           metadata: {},
         },
       ]
-      await tursoDB.insert('test', docs)
+      await libsqlDB.insert('test', docs)
 
       // Verify both documents exist
-      let results = await tursoDB.query('test', '', ['id'], 10)
+      let results = await libsqlDB.query('test', '', ['id'], 10)
       expect(results).toHaveLength(2)
 
       // Delete one document
-      await tursoDB.delete('test', ['delete-me'])
+      await libsqlDB.delete('test', ['delete-me'])
 
       // Verify only one document remains
-      results = await tursoDB.query('test', '', ['id'], 10)
+      results = await libsqlDB.query('test', '', ['id'], 10)
       expect(results).toHaveLength(1)
       expect(results[0].id).toBe('keep-me')
     })
 
     it('should handle non-existent IDs gracefully', async () => {
-      await tursoDB.createCollection('test', 128)
+      await libsqlDB.createCollection('test', 128)
       const doc: VectorDocument = {
         id: 'existing',
         vector: Array.from({ length: 128 }).fill(0.1),
@@ -289,13 +289,13 @@ describe('tursoVectorDatabase', () => {
         fileExtension: '.ts',
         metadata: {},
       }
-      await tursoDB.insert('test', [doc])
+      await libsqlDB.insert('test', [doc])
 
       // Should not throw when deleting non-existent ID
-      await expect(tursoDB.delete('test', ['non-existent-id'])).resolves.not.toThrow()
+      await expect(libsqlDB.delete('test', ['non-existent-id'])).resolves.not.toThrow()
 
       // Original document should still exist
-      const results = await tursoDB.query('test', '', ['id'], 10)
+      const results = await libsqlDB.query('test', '', ['id'], 10)
       expect(results).toHaveLength(1)
     })
   })
@@ -325,20 +325,20 @@ describe('tursoVectorDatabase', () => {
     ]
 
     it('should filter by fileExtension', async () => {
-      await tursoDB.createCollection('test', 128)
-      await tursoDB.insert('test', testDocs)
+      await libsqlDB.createCollection('test', 128)
+      await libsqlDB.insert('test', testDocs)
 
-      const results = await tursoDB.query('test', 'fileExtension == \'.ts\'', ['id', 'content'])
+      const results = await libsqlDB.query('test', 'fileExtension == \'.ts\'', ['id', 'content'])
 
       expect(results).toHaveLength(1)
       expect(results[0].id).toBe('ts-file')
     })
 
     it('should return all documents when no filter', async () => {
-      await tursoDB.createCollection('test', 128)
-      await tursoDB.insert('test', testDocs)
+      await libsqlDB.createCollection('test', 128)
+      await libsqlDB.insert('test', testDocs)
 
-      const results = await tursoDB.query('test', '', ['id'], 10)
+      const results = await libsqlDB.query('test', '', ['id'], 10)
 
       expect(results).toHaveLength(2)
     })
@@ -346,19 +346,19 @@ describe('tursoVectorDatabase', () => {
 
   describe('dropCollection', () => {
     it('should remove database file when dropping collection', async () => {
-      await tursoDB.createCollection('drop-test', 128)
+      await libsqlDB.createCollection('drop-test', 128)
       const dbPath = path.join(tempDir, 'drop-test.db')
 
       expect(await fs.pathExists(dbPath)).toBe(true)
 
-      await tursoDB.dropCollection('drop-test')
+      await libsqlDB.dropCollection('drop-test')
 
       expect(await fs.pathExists(dbPath)).toBe(false)
-      expect(await tursoDB.hasCollection('drop-test')).toBe(false)
+      expect(await libsqlDB.hasCollection('drop-test')).toBe(false)
     })
 
     it('should remove BM25 model file for hybrid collection', async () => {
-      await tursoDB.createHybridCollection('hybrid-drop', 128)
+      await libsqlDB.createHybridCollection('hybrid-drop', 128)
 
       const docs: VectorDocument[] = [{
         id: 'test',
@@ -370,12 +370,12 @@ describe('tursoVectorDatabase', () => {
         fileExtension: '.ts',
         metadata: {},
       }]
-      await tursoDB.insertHybrid('hybrid-drop', docs)
+      await libsqlDB.insertHybrid('hybrid-drop', docs)
 
       const bm25Path = path.join(tempDir, 'hybrid-drop_bm25.json')
       expect(await fs.pathExists(bm25Path)).toBe(true)
 
-      await tursoDB.dropCollection('hybrid-drop')
+      await libsqlDB.dropCollection('hybrid-drop')
 
       expect(await fs.pathExists(bm25Path)).toBe(false)
     })
@@ -383,7 +383,7 @@ describe('tursoVectorDatabase', () => {
 
   describe('checkCollectionLimit', () => {
     it('should always return true (no limit)', async () => {
-      expect(await tursoDB.checkCollectionLimit()).toBe(true)
+      expect(await libsqlDB.checkCollectionLimit()).toBe(true)
     })
   })
 })

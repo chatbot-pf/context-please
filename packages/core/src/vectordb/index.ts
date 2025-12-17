@@ -38,7 +38,7 @@ catch (error: any) {
 export { SparseVectorGenerator } from './sparse/sparse-vector-generator'
 export { SparseVector, SparseVectorConfig } from './sparse/types'
 
-export { TursoConfig, TursoVectorDatabase } from './turso-vectordb'
+export { LibSQLConfig, LibSQLVectorDatabase } from './libsql-vectordb'
 // Re-export types and interfaces
 export {
   COLLECTION_LIMIT_MESSAGE,

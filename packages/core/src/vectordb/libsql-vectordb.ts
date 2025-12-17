@@ -15,10 +15,10 @@ import {
   VectorSearchResult,
 } from './types'
 
-export interface TursoConfig extends BaseDatabaseConfig {
+export interface LibSQLConfig extends BaseDatabaseConfig {
   /**
-   * Storage directory for Turso SQLite databases
-   * @default ~/.context/turso-indexes
+   * Storage directory for LibSQL databases
+   * @default ~/.context/libsql-indexes
    */
   storageDir?: string
 
@@ -48,7 +48,7 @@ interface CollectionMetadata {
 }
 
 /**
- * Turso (libSQL) Vector Database implementation for local-only deployments
+ * LibSQL Vector Database implementation for local-only deployments
  *
  * Features:
  * - Pure JavaScript SDK (no native bindings required)
@@ -64,7 +64,7 @@ interface CollectionMetadata {
  * - Hybrid search: Combines both using RRF fusion
  *
  * Storage structure:
- * ~/.context/turso-indexes/
+ * ~/.context/libsql-indexes/
  *   └── {collection_name}.db    # SQLite database file
  *
  * Key advantages over FAISS:
@@ -72,15 +72,15 @@ interface CollectionMetadata {
  * - Query filters ARE supported (SQL WHERE)
  * - No native bindings required
  */
-export class TursoVectorDatabase extends BaseVectorDatabase<TursoConfig> {
+export class LibSQLVectorDatabase extends BaseVectorDatabase<LibSQLConfig> {
   private clients: Map<string, Client> = new Map()
   private bm25Generators: Map<string, SimpleBM25> = new Map()
   private metadataCache: Map<string, CollectionMetadata> = new Map()
 
-  constructor(config: TursoConfig) {
-    const configWithDefaults: TursoConfig = {
+  constructor(config: LibSQLConfig) {
+    const configWithDefaults: LibSQLConfig = {
       ...config,
-      storageDir: config.storageDir || path.join(os.homedir(), '.context', 'turso-indexes'),
+      storageDir: config.storageDir || path.join(os.homedir(), '.context', 'libsql-indexes'),
       walMode: config.walMode !== false,
       cacheSize: config.cacheSize || 2000,
     }
@@ -92,17 +92,17 @@ export class TursoVectorDatabase extends BaseVectorDatabase<TursoConfig> {
   }
 
   /**
-   * Initialize Turso storage directory
+   * Initialize LibSQL storage directory
    */
   protected async initialize(): Promise<void> {
     try {
-      console.log('[TursoDB] Initializing Turso storage at:', this.storageDir)
+      console.log('[LibSQLDB] Initializing LibSQL storage at:', this.storageDir)
       await fs.ensureDir(this.storageDir)
-      console.log('[TursoDB] Turso storage initialized')
+      console.log('[LibSQLDB] LibSQL storage initialized')
     }
     catch (error: any) {
-      const errorMsg = `Failed to initialize Turso storage at ${this.storageDir}: ${error.message}`
-      console.error(`[TursoDB] ${errorMsg}`)
+      const errorMsg = `Failed to initialize LibSQL storage at ${this.storageDir}: ${error.message}`
+      console.error(`[LibSQLDB] ${errorMsg}`)
 
       if (error.code === 'EACCES') {
         throw new Error(`${errorMsg}\nPermission denied. Check directory permissions.`)
@@ -115,7 +115,7 @@ export class TursoVectorDatabase extends BaseVectorDatabase<TursoConfig> {
   }
 
   /**
-   * Turso collections are loaded on-demand when accessed
+   * LibSQL collections are loaded on-demand when accessed
    */
   protected async ensureLoaded(collectionName: string): Promise<void> {
     if (this.clients.has(collectionName)) {
@@ -142,7 +142,7 @@ export class TursoVectorDatabase extends BaseVectorDatabase<TursoConfig> {
    */
   private async loadCollection(collectionName: string): Promise<void> {
     const dbPath = this.getDbPath(collectionName)
-    console.log('[TursoDB] Loading collection:', collectionName)
+    console.log('[LibSQLDB] Loading collection:', collectionName)
 
     try {
       const client = createClient({ url: `file:${dbPath}` })
@@ -176,10 +176,10 @@ export class TursoVectorDatabase extends BaseVectorDatabase<TursoConfig> {
         }
       }
 
-      console.log('[TursoDB] Loaded collection:', collectionName)
+      console.log('[LibSQLDB] Loaded collection:', collectionName)
     }
     catch (error: any) {
-      console.error(`[TursoDB] Failed to load collection ${collectionName}:`, error.message)
+      console.error(`[LibSQLDB] Failed to load collection ${collectionName}:`, error.message)
       throw error
     }
   }
@@ -236,8 +236,8 @@ export class TursoVectorDatabase extends BaseVectorDatabase<TursoConfig> {
       throw new Error(`Collection ${collectionName} already exists`)
     }
 
-    console.log('[TursoDB] Creating collection:', collectionName)
-    console.log('[TursoDB] Vector dimension:', dimension)
+    console.log('[LibSQLDB] Creating collection:', collectionName)
+    console.log('[LibSQLDB] Vector dimension:', dimension)
 
     const client = createClient({ url: `file:${dbPath}` })
 
@@ -290,7 +290,7 @@ export class TursoVectorDatabase extends BaseVectorDatabase<TursoConfig> {
       createdAt: new Date().toISOString(),
     })
 
-    console.log('[TursoDB] Collection created:', collectionName)
+    console.log('[LibSQLDB] Collection created:', collectionName)
   }
 
   /**
@@ -304,8 +304,8 @@ export class TursoVectorDatabase extends BaseVectorDatabase<TursoConfig> {
       throw new Error(`Collection ${collectionName} already exists`)
     }
 
-    console.log('[TursoDB] Creating hybrid collection:', collectionName)
-    console.log('[TursoDB] Vector dimension:', dimension)
+    console.log('[LibSQLDB] Creating hybrid collection:', collectionName)
+    console.log('[LibSQLDB] Vector dimension:', dimension)
 
     const client = createClient({ url: `file:${dbPath}` })
 
@@ -363,7 +363,7 @@ export class TursoVectorDatabase extends BaseVectorDatabase<TursoConfig> {
     // Initialize BM25 generator
     this.bm25Generators.set(collectionName, new SimpleBM25(this.config.bm25Config))
 
-    console.log('[TursoDB] Hybrid collection created:', collectionName)
+    console.log('[LibSQLDB] Hybrid collection created:', collectionName)
   }
 
   /**
@@ -372,7 +372,7 @@ export class TursoVectorDatabase extends BaseVectorDatabase<TursoConfig> {
   async dropCollection(collectionName: string): Promise<void> {
     await this.ensureInitialized()
 
-    console.log('[TursoDB] Dropping collection:', collectionName)
+    console.log('[LibSQLDB] Dropping collection:', collectionName)
 
     // Close client if exists
     const client = this.clients.get(collectionName)
@@ -403,7 +403,7 @@ export class TursoVectorDatabase extends BaseVectorDatabase<TursoConfig> {
     await fs.remove(walPath)
     await fs.remove(shmPath)
 
-    console.log('[TursoDB] Collection dropped:', collectionName)
+    console.log('[LibSQLDB] Collection dropped:', collectionName)
   }
 
   /**
@@ -452,7 +452,7 @@ export class TursoVectorDatabase extends BaseVectorDatabase<TursoConfig> {
       throw new Error(`Collection ${collectionName} metadata not found`)
     }
 
-    console.log('[TursoDB] Inserting documents:', documents.length)
+    console.log('[LibSQLDB] Inserting documents:', documents.length)
 
     // Validate vector dimensions
     for (const doc of documents) {
@@ -484,7 +484,7 @@ export class TursoVectorDatabase extends BaseVectorDatabase<TursoConfig> {
     await client.batch(statements)
     await this.updateDocumentCount(collectionName)
 
-    console.log('[TursoDB] Inserted documents:', documents.length)
+    console.log('[LibSQLDB] Inserted documents:', documents.length)
   }
 
   /**
@@ -503,7 +503,7 @@ export class TursoVectorDatabase extends BaseVectorDatabase<TursoConfig> {
       throw new Error(`Collection ${collectionName} is not a hybrid collection`)
     }
 
-    console.log('[TursoDB] Inserting hybrid documents:', documents.length)
+    console.log('[LibSQLDB] Inserting hybrid documents:', documents.length)
 
     // Validate vector dimensions
     for (const doc of documents) {
@@ -555,7 +555,7 @@ export class TursoVectorDatabase extends BaseVectorDatabase<TursoConfig> {
     await this.updateDocumentCount(collectionName)
     await this.saveBM25(collectionName)
 
-    console.log('[TursoDB] Inserted hybrid documents:', documents.length)
+    console.log('[LibSQLDB] Inserted hybrid documents:', documents.length)
   }
 
   /**
@@ -568,7 +568,7 @@ export class TursoVectorDatabase extends BaseVectorDatabase<TursoConfig> {
     const topK = options?.topK || 10
     const queryVectorStr = `[${queryVector.join(',')}]`
 
-    console.log('[TursoDB] Searching vectors, topK:', topK)
+    console.log('[LibSQLDB] Searching vectors, topK:', topK)
 
     // Build query with vector_top_k
     // Note: vector_top_k returns 'id' (rowid), we calculate distance with vector_distance_cos
@@ -605,7 +605,7 @@ export class TursoVectorDatabase extends BaseVectorDatabase<TursoConfig> {
       })
     }
 
-    console.log('[TursoDB] Found results:', searchResults.length)
+    console.log('[LibSQLDB] Found results:', searchResults.length)
     return searchResults
   }
 
@@ -626,7 +626,7 @@ export class TursoVectorDatabase extends BaseVectorDatabase<TursoConfig> {
     }
 
     const limit = options?.limit || 10
-    console.log('[TursoDB] Hybrid search, requests:', searchRequests.length)
+    console.log('[LibSQLDB] Hybrid search, requests:', searchRequests.length)
 
     // Process search requests
     const denseResults = new Map<string, number>()
@@ -674,7 +674,7 @@ export class TursoVectorDatabase extends BaseVectorDatabase<TursoConfig> {
       }
     }
 
-    console.log('[TursoDB] Hybrid search results:', results.length)
+    console.log('[LibSQLDB] Hybrid search results:', results.length)
     return results
   }
 
@@ -832,7 +832,7 @@ export class TursoVectorDatabase extends BaseVectorDatabase<TursoConfig> {
     }
 
     // Return as-is if not recognized
-    console.warn(`[TursoDB] Unrecognized filter expression: ${expr}`)
+    console.warn(`[LibSQLDB] Unrecognized filter expression: ${expr}`)
     return expr
   }
 
@@ -852,13 +852,13 @@ export class TursoVectorDatabase extends BaseVectorDatabase<TursoConfig> {
   /**
    * Delete documents by IDs
    *
-   * Key advantage over FAISS: Turso supports document deletion via SQL DELETE
+   * Key advantage over FAISS: LibSQL supports document deletion via SQL DELETE
    */
   async delete(collectionName: string, ids: string[]): Promise<void> {
     await this.ensureInitialized()
     const client = await this.getClient(collectionName)
 
-    console.log(`[TursoDB] Deleting ${ids.length} documents from ${collectionName}`)
+    console.log(`[LibSQLDB] Deleting ${ids.length} documents from ${collectionName}`)
 
     const placeholders = ids.map(() => '?').join(',')
     await client.execute({
@@ -882,13 +882,13 @@ export class TursoVectorDatabase extends BaseVectorDatabase<TursoConfig> {
       }
     }
 
-    console.log(`[TursoDB] Deleted ${ids.length} documents`)
+    console.log(`[LibSQLDB] Deleted ${ids.length} documents`)
   }
 
   /**
    * Query documents with filter conditions
    *
-   * Key advantage over FAISS: Turso supports SQL WHERE clauses
+   * Key advantage over FAISS: LibSQL supports SQL WHERE clauses
    */
   async query(
     collectionName: string,
@@ -899,7 +899,7 @@ export class TursoVectorDatabase extends BaseVectorDatabase<TursoConfig> {
     await this.ensureInitialized()
     const client = await this.getClient(collectionName)
 
-    console.log('[TursoDB] Querying documents')
+    console.log('[LibSQLDB] Querying documents')
 
     // Build SELECT clause
     const fields = outputFields.length > 0
@@ -944,7 +944,7 @@ export class TursoVectorDatabase extends BaseVectorDatabase<TursoConfig> {
 
   /**
    * Check collection limit
-   * Turso has no inherent collection limit (only limited by disk space)
+   * LibSQL has no inherent collection limit (only limited by disk space)
    */
   async checkCollectionLimit(): Promise<boolean> {
     return true
