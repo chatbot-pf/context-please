@@ -172,6 +172,7 @@ export class LibSQLVectorDatabase extends BaseVectorDatabase<LibSQLConfig> {
           this.bm25Generators.set(collectionName, bm25)
         }
         else {
+          console.warn(`[LibSQLDB] BM25 model file missing for hybrid collection ${collectionName}. Sparse search will be unavailable until re-indexing.`)
           this.bm25Generators.set(collectionName, new SimpleBM25(this.config.bm25Config))
         }
       }
@@ -197,9 +198,17 @@ export class LibSQLVectorDatabase extends BaseVectorDatabase<LibSQLConfig> {
    */
   private async saveBM25(collectionName: string): Promise<void> {
     const bm25 = this.bm25Generators.get(collectionName)
-    if (bm25) {
-      const bm25Path = path.join(this.storageDir, `${collectionName}_bm25.json`)
+    if (!bm25) {
+      return
+    }
+
+    const bm25Path = path.join(this.storageDir, `${collectionName}_bm25.json`)
+    try {
       await fs.writeFile(bm25Path, bm25.toJSON(), 'utf-8')
+    }
+    catch (error: any) {
+      console.error(`[LibSQLDB] Failed to save BM25 model for ${collectionName}:`, error.message)
+      throw new Error(`Failed to save BM25 model for ${collectionName}: ${error.message}`)
     }
   }
 
@@ -208,20 +217,33 @@ export class LibSQLVectorDatabase extends BaseVectorDatabase<LibSQLConfig> {
    */
   private async updateDocumentCount(collectionName: string): Promise<void> {
     const client = this.clients.get(collectionName)
-    if (!client)
+    if (!client) {
+      console.warn(`[LibSQLDB] Cannot update document count: client not found for ${collectionName}`)
       return
+    }
 
-    const result = await client.execute('SELECT COUNT(*) as count FROM documents')
-    const count = Number(result.rows[0].count)
+    try {
+      const result = await client.execute('SELECT COUNT(*) as count FROM documents')
+      const count = Number(result.rows[0].count)
 
-    await client.execute({
-      sql: 'INSERT OR REPLACE INTO _metadata (key, value) VALUES (?, ?)',
-      args: ['documentCount', String(count)],
-    })
+      if (Number.isNaN(count)) {
+        console.error(`[LibSQLDB] Invalid document count result for ${collectionName}`)
+        return
+      }
 
-    const metadata = this.metadataCache.get(collectionName)
-    if (metadata) {
-      metadata.documentCount = count
+      await client.execute({
+        sql: 'INSERT OR REPLACE INTO _metadata (key, value) VALUES (?, ?)',
+        args: ['documentCount', String(count)],
+      })
+
+      const metadata = this.metadataCache.get(collectionName)
+      if (metadata) {
+        metadata.documentCount = count
+      }
+    }
+    catch (error: any) {
+      console.error(`[LibSQLDB] Failed to update document count for ${collectionName}:`, error.message)
+      // Don't throw - this is a non-critical metadata update
     }
   }
 
@@ -714,7 +736,12 @@ export class LibSQLVectorDatabase extends BaseVectorDatabase<LibSQLConfig> {
     results: Map<string, number>,
   ): Promise<void> {
     const bm25 = this.bm25Generators.get(collectionName)
-    if (!bm25 || !bm25.isTrained()) {
+    if (!bm25) {
+      console.warn(`[LibSQLDB] BM25 generator not found for collection ${collectionName}. Sparse search skipped.`)
+      return
+    }
+    if (!bm25.isTrained()) {
+      console.warn(`[LibSQLDB] BM25 model not trained for collection ${collectionName}. Sparse search skipped.`)
       return
     }
 

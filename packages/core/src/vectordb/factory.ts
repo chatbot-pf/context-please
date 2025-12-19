@@ -1,13 +1,13 @@
 import type { FaissConfig } from './faiss-vectordb'
+import type { LibSQLConfig } from './libsql-vectordb'
 import type { MilvusRestfulConfig } from './milvus-restful-vectordb'
 import type { MilvusConfig } from './milvus-vectordb'
 import type { QdrantConfig } from './qdrant-vectordb'
-import type { LibSQLConfig } from './libsql-vectordb'
 import type { VectorDatabase } from './types'
+import { LibSQLVectorDatabase } from './libsql-vectordb'
 import { MilvusRestfulVectorDatabase } from './milvus-restful-vectordb'
 import { MilvusVectorDatabase } from './milvus-vectordb'
 import { QdrantVectorDatabase } from './qdrant-vectordb'
-import { LibSQLVectorDatabase } from './libsql-vectordb'
 
 // FAISS is optional - may not be available in all environments (e.g., CI without native bindings)
 // Use lazy loading to avoid import errors
@@ -87,7 +87,7 @@ export enum VectorDatabaseType {
    * Use for local-only deployments without native bindings
    * Advantages over FAISS: supports deletion, filtering, pure JS
    */
-  LIBSQL_LOCAL = 'libsql-local',
+  LIBSQL_LOCAL = 'libsql',
 }
 
 /**

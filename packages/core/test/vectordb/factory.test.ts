@@ -8,10 +8,10 @@ import {
   VectorDatabaseType,
 } from '../../src/vectordb/factory'
 import { FaissVectorDatabase } from '../../src/vectordb/faiss-vectordb'
+import { LibSQLVectorDatabase } from '../../src/vectordb/libsql-vectordb'
 import { MilvusRestfulVectorDatabase } from '../../src/vectordb/milvus-restful-vectordb'
 import { MilvusVectorDatabase } from '../../src/vectordb/milvus-vectordb'
 import { QdrantVectorDatabase } from '../../src/vectordb/qdrant-vectordb'
-import { LibSQLVectorDatabase } from '../../src/vectordb/libsql-vectordb'
 
 describe('vectorDatabaseFactory', () => {
   describe('create', () => {
@@ -175,7 +175,7 @@ describe('vectorDatabaseFactory', () => {
     })
 
     it('should have LIBSQL_LOCAL type', () => {
-      expect(VectorDatabaseType.LIBSQL_LOCAL).toBe('libsql-local')
+      expect(VectorDatabaseType.LIBSQL_LOCAL).toBe('libsql')
     })
   })
 

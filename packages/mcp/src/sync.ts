@@ -132,8 +132,8 @@ export class SyncManager {
           console.log('[SYNC-DEBUG] Collection not yet established, this is expected for new cluster users. Will retry on next sync cycle.')
         }
         else {
+          // Don't throw - errors in setTimeout callbacks are not catchable and would cause unhandled rejection
           console.error('[SYNC-DEBUG] Initial sync failed with unexpected error:', error)
-          throw error
         }
       }
     }, 5000) // Initial sync after 5 seconds
@@ -142,7 +142,9 @@ export class SyncManager {
     console.log('[SYNC-DEBUG] Setting up periodic sync every 5 minutes (300000ms)')
     const syncInterval = setInterval(() => {
       console.log('[SYNC-DEBUG] Executing scheduled periodic sync')
-      this.handleSyncIndex()
+      this.handleSyncIndex().catch((error) => {
+        console.error('[SYNC-DEBUG] Periodic sync failed:', error instanceof Error ? error.message : error)
+      })
     }, 5 * 60 * 1000) // every 5 minutes
 
     console.log('[SYNC-DEBUG] Background sync setup complete. Interval ID:', syncInterval)

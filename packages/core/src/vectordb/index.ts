@@ -7,13 +7,12 @@ export { VectorDatabaseFactory, VectorDatabaseType } from './factory'
 export type { VectorDatabaseConfig } from './factory'
 // Implementation class exports
 export type { FaissConfig } from './faiss-vectordb'
+export { LibSQLConfig, LibSQLVectorDatabase } from './libsql-vectordb'
 export { MilvusRestfulConfig, MilvusRestfulVectorDatabase } from './milvus-restful-vectordb'
+
 export { MilvusConfig, MilvusVectorDatabase } from './milvus-vectordb'
 
 export { QdrantConfig, QdrantVectorDatabase } from './qdrant-vectordb'
-
-// Sparse vector exports
-export { BM25Config, SimpleBM25 } from './sparse/simple-bm25'
 
 // FAISS is conditionally exported (may not be available without native bindings)
 // Use VectorDatabaseFactory to check availability: VectorDatabaseFactory.isFaissAvailable()
@@ -35,10 +34,11 @@ catch (error: any) {
     throw error // Re-throw unexpected errors
   }
 }
+// Sparse vector exports
+export { BM25Config, SimpleBM25 } from './sparse/simple-bm25'
 export { SparseVectorGenerator } from './sparse/sparse-vector-generator'
-export { SparseVector, SparseVectorConfig } from './sparse/types'
 
-export { LibSQLConfig, LibSQLVectorDatabase } from './libsql-vectordb'
+export { SparseVector, SparseVectorConfig } from './sparse/types'
 // Re-export types and interfaces
 export {
   COLLECTION_LIMIT_MESSAGE,
