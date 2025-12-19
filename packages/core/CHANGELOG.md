@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/pleaseai/context-please/compare/core-v0.6.0...core-v0.7.0) (2025-12-19)
+
+
+### Features
+
+* **core,mcp:** add LibSQL vector database support for local-only deployments ([#56](https://github.com/pleaseai/context-please/issues/56)) ([0df83cb](https://github.com/pleaseai/context-please/commit/0df83cb5416629a9bca6dfc08371033525785468))
+
 ## [0.6.0](https://github.com/pleaseai/context-please/compare/core-v0.5.1...core-v0.6.0) (2025-12-19)
 
 
