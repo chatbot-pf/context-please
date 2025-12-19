@@ -18,7 +18,7 @@ export interface ContextMcpConfig {
   // HuggingFace configuration
   huggingfaceDtype?: 'fp32' | 'fp16' | 'q8' | 'q4' | 'q4f16'
   // Vector database configuration
-  vectorDbType?: 'milvus' | 'qdrant' | 'faiss-local' // Vector database type (default: faiss-local for local dev)
+  vectorDbType?: 'milvus' | 'qdrant' | 'faiss-local' | 'libsql' // Vector database type (default: faiss-local for local dev)
   milvusAddress?: string // Optional, can be auto-resolved from token
   milvusToken?: string
   qdrantUrl?: string // Qdrant URL (e.g., http://localhost:6333 or cloud URL)
@@ -146,7 +146,7 @@ export function createMcpConfig(): ContextMcpConfig {
     // HuggingFace configuration
     huggingfaceDtype: (envManager.get('HUGGINGFACE_DTYPE') as 'fp32' | 'fp16' | 'q8' | 'q4' | 'q4f16') || undefined,
     // Vector database configuration
-    vectorDbType: (envManager.get('VECTOR_DB_TYPE') as 'milvus' | 'qdrant' | 'faiss-local') || 'faiss-local',
+    vectorDbType: (envManager.get('VECTOR_DB_TYPE') as 'milvus' | 'qdrant' | 'faiss-local' | 'libsql') || 'faiss-local',
     milvusAddress: envManager.get('MILVUS_ADDRESS'), // Optional, can be resolved from token
     milvusToken: envManager.get('MILVUS_TOKEN'),
     qdrantUrl: envManager.get('QDRANT_URL'),
@@ -169,6 +169,12 @@ export function logConfigurationSummary(config: ContextMcpConfig): void {
   if (config.vectorDbType === 'qdrant') {
     console.log(`[MCP]   Qdrant URL: ${config.qdrantUrl || '[Not configured]'}`)
     console.log(`[MCP]   Qdrant API Key: ${config.qdrantApiKey ? '✅ Configured' : '❌ Not configured'}`)
+  }
+  else if (config.vectorDbType === 'libsql') {
+    console.log(`[MCP]   LibSQL Storage: ${process.env.LIBSQL_STORAGE_DIR || '~/.context/libsql-indexes'}`)
+  }
+  else if (config.vectorDbType === 'faiss-local') {
+    console.log(`[MCP]   FAISS Storage: ${process.env.FAISS_STORAGE_DIR || '~/.context/faiss-indexes'}`)
   }
   else {
     console.log(`[MCP]   Milvus Address: ${config.milvusAddress || (config.milvusToken ? '[Auto-resolve from token]' : '[Not configured]')}`)
@@ -236,11 +242,12 @@ Environment Variables:
   HUGGINGFACE_DTYPE       Model dtype: fp32, fp16, q8, q4, q4f16 (default: fp32)
 
   Vector Database Configuration:
-  VECTOR_DB_TYPE          Vector database type: faiss-local (default), milvus, or qdrant
+  VECTOR_DB_TYPE          Vector database type: faiss-local (default), milvus, qdrant, or libsql
   MILVUS_ADDRESS          Milvus address (optional, can be auto-resolved from token)
   MILVUS_TOKEN            Milvus token (optional, used for authentication and address resolution)
   QDRANT_URL              Qdrant URL (e.g., http://localhost:6333 or cloud URL)
   QDRANT_API_KEY          Qdrant API key (optional for self-hosted)
+  LIBSQL_STORAGE_DIR      LibSQL storage directory (default: ~/.context/libsql-indexes)
 
 Examples:
   # Start MCP server with OpenAI (default) and explicit Milvus address
@@ -272,5 +279,8 @@ Examples:
 
   # Start MCP server with HuggingFace and quantized model for faster inference
   EMBEDDING_PROVIDER=HuggingFace HUGGINGFACE_DTYPE=q8 MILVUS_TOKEN=your-token npx @pleaseai/context-please-mcp@latest
+
+  # Start MCP server with LibSQL (local, no external dependencies, pure JS)
+  EMBEDDING_PROVIDER=HuggingFace VECTOR_DB_TYPE=libsql npx @pleaseai/context-please-mcp@latest
         `)
 }

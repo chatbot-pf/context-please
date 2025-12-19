@@ -10,7 +10,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
-import { Context, MilvusVectorDatabase, QdrantVectorDatabase, VectorDatabase, VectorDatabaseFactory, VectorDatabaseType } from '@pleaseai/context-please-core'
+import { Context, LibSQLVectorDatabase, MilvusVectorDatabase, QdrantVectorDatabase, VectorDatabase, VectorDatabaseFactory, VectorDatabaseType } from '@pleaseai/context-please-core'
 
 // Import our modular components
 import { ContextMcpConfig, createMcpConfig, logConfigurationSummary, showHelpMessage } from './config.js'
@@ -116,6 +116,13 @@ class ContextMcpServer {
       vectorDatabase = new QdrantVectorDatabase({
         address: grpcAddress,
         ...(config.qdrantApiKey && { apiKey: config.qdrantApiKey }),
+      })
+    }
+    else if (config.vectorDbType === 'libsql') {
+      // LibSQL local database - pure JavaScript, no native bindings required
+      console.log('[VECTORDB] Using LibSQL (local file-based, pure JS)')
+      vectorDatabase = new LibSQLVectorDatabase({
+        storageDir: process.env.LIBSQL_STORAGE_DIR,
       })
     }
     else {

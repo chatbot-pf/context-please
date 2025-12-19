@@ -1,4 +1,3 @@
-import type { ContentEmbedding } from '@google/genai'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { GeminiEmbedding } from '../../src/embedding/gemini-embedding'
 
@@ -16,14 +15,14 @@ vi.mock('@google/genai', () => {
   }
 })
 
-describe('GeminiEmbedding', () => {
+describe('geminiEmbedding', () => {
   let embedding: GeminiEmbedding
 
   beforeEach(() => {
     // Clear calls history and restore default implementation
     mockEmbedContent.mockClear()
     mockEmbedContent.mockResolvedValue({
-      embeddings: [{ values: new Array(3072).fill(0.1) }],
+      embeddings: [{ values: Array.from({ length: 3072 }).fill(0.1) }],
     })
 
     embedding = new GeminiEmbedding({
@@ -82,7 +81,7 @@ describe('GeminiEmbedding', () => {
       const mockResponse = {
         embeddings: [
           {
-            values: new Array(3072).fill(0.1),
+            values: Array.from({ length: 3072 }).fill(0.1),
           },
         ],
       }
@@ -98,9 +97,9 @@ describe('GeminiEmbedding', () => {
     it('should embed batch of texts successfully', async () => {
       const mockResponse = {
         embeddings: [
-          { values: new Array(3072).fill(0.1) },
-          { values: new Array(3072).fill(0.2) },
-          { values: new Array(3072).fill(0.3) },
+          { values: Array.from({ length: 3072 }).fill(0.1) },
+          { values: Array.from({ length: 3072 }).fill(0.2) },
+          { values: Array.from({ length: 3072 }).fill(0.3) },
         ],
       }
       mockEmbedContent.mockResolvedValue(mockResponse)
@@ -116,7 +115,7 @@ describe('GeminiEmbedding', () => {
       const mockResponse = {
         embeddings: [
           {
-            values: new Array(3072).fill(0.1),
+            values: Array.from({ length: 3072 }).fill(0.1),
           },
         ],
       }
@@ -207,7 +206,7 @@ describe('GeminiEmbedding', () => {
           throw error
         }
         return Promise.resolve({
-          embeddings: [{ values: new Array(3072).fill(0.1) }],
+          embeddings: [{ values: Array.from({ length: 3072 }).fill(0.1) }],
         })
       })
 
@@ -244,9 +243,9 @@ describe('GeminiEmbedding', () => {
 
       let attemptCount = 0
       const delays: number[] = []
-      const originalSetTimeout = global.setTimeout
+      const originalSetTimeout = globalThis.setTimeout
 
-      vi.spyOn(global, 'setTimeout').mockImplementation((callback: any, delay: number) => {
+      vi.spyOn(globalThis, 'setTimeout').mockImplementation((callback: any, delay: number) => {
         delays.push(delay)
         return originalSetTimeout(callback, 0) as any
       })
@@ -259,7 +258,7 @@ describe('GeminiEmbedding', () => {
           throw error
         }
         return Promise.resolve({
-          embeddings: [{ values: new Array(3072).fill(0.1) }],
+          embeddings: [{ values: Array.from({ length: 3072 }).fill(0.1) }],
         })
       })
 
@@ -285,14 +284,11 @@ describe('GeminiEmbedding', () => {
         callCount++
         // First call (batch) fails with non-retryable error
         if (callCount === 1) {
-          return Promise.reject({
-            status: 400,
-            message: 'Batch processing failed',
-          })
+          return Promise.reject(new Error('Batch processing failed'))
         }
         // Subsequent calls (individual) succeed
         return Promise.resolve({
-          embeddings: [{ values: new Array(3072).fill(0.1) }],
+          embeddings: [{ values: Array.from({ length: 3072 }).fill(0.1) }],
         })
       })
 
@@ -309,14 +305,11 @@ describe('GeminiEmbedding', () => {
         callCount++
         // First call (batch) fails with non-retryable error
         if (callCount === 1) {
-          return Promise.reject({
-            status: 400,
-            message: 'Batch processing failed',
-          })
+          return Promise.reject(new Error('Batch processing failed'))
         }
         // Subsequent individual calls succeed with different values
         return Promise.resolve({
-          embeddings: [{ values: new Array(3072).fill(callCount * 0.1) }],
+          embeddings: [{ values: Array.from({ length: 3072 }).fill(callCount * 0.1) }],
         })
       })
 
@@ -415,7 +408,7 @@ describe('GeminiEmbedding', () => {
     it('should handle concurrent requests', async () => {
       mockEmbedContent.mockImplementation(() => {
         return Promise.resolve({
-          embeddings: [{ values: new Array(3072).fill(0.1) }],
+          embeddings: [{ values: Array.from({ length: 3072 }).fill(0.1) }],
         })
       })
 
@@ -433,7 +426,7 @@ describe('GeminiEmbedding', () => {
     it('should handle null/undefined text input', async () => {
       mockEmbedContent.mockImplementation(() => {
         return Promise.resolve({
-          embeddings: [{ values: new Array(3072).fill(0.1) }],
+          embeddings: [{ values: Array.from({ length: 3072 }).fill(0.1) }],
         })
       })
 
@@ -464,7 +457,7 @@ describe('GeminiEmbedding', () => {
     it('should complete embedding within reasonable time', async () => {
       mockEmbedContent.mockImplementation(() => {
         return Promise.resolve({
-          embeddings: [{ values: new Array(3072).fill(0.1) }],
+          embeddings: [{ values: Array.from({ length: 3072 }).fill(0.1) }],
         })
       })
 
@@ -476,10 +469,10 @@ describe('GeminiEmbedding', () => {
     })
 
     it('should handle large batch efficiently', async () => {
-      const largeBatch = new Array(100).fill('test text')
+      const largeBatch = Array.from({ length: 100 }).fill('test text')
       mockEmbedContent.mockImplementation(() => {
         return Promise.resolve({
-          embeddings: largeBatch.map(() => ({ values: new Array(3072).fill(0.1) })),
+          embeddings: largeBatch.map(() => ({ values: Array.from({ length: 3072 }).fill(0.1) })),
         })
       })
 

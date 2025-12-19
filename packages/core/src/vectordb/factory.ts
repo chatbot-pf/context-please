@@ -1,8 +1,10 @@
 import type { FaissConfig } from './faiss-vectordb'
+import type { LibSQLConfig } from './libsql-vectordb'
 import type { MilvusRestfulConfig } from './milvus-restful-vectordb'
 import type { MilvusConfig } from './milvus-vectordb'
 import type { QdrantConfig } from './qdrant-vectordb'
 import type { VectorDatabase } from './types'
+import { LibSQLVectorDatabase } from './libsql-vectordb'
 import { MilvusRestfulVectorDatabase } from './milvus-restful-vectordb'
 import { MilvusVectorDatabase } from './milvus-vectordb'
 import { QdrantVectorDatabase } from './qdrant-vectordb'
@@ -32,8 +34,8 @@ function checkFaissAvailability(): boolean {
     // 2. Module not found errors (module path resolution in test environments)
     const isExpectedUnavailableError
       = errorMsg.includes('Could not locate the bindings file')
-      || errorMsg.includes('faiss-node')
-      || errorCode === 'MODULE_NOT_FOUND'
+        || errorMsg.includes('faiss-node')
+        || errorCode === 'MODULE_NOT_FOUND'
 
     if (isExpectedUnavailableError) {
       faissAvailable = false
@@ -79,6 +81,13 @@ export enum VectorDatabaseType {
    * Ideal for development and small-to-medium codebases
    */
   FAISS_LOCAL = 'faiss-local',
+
+  /**
+   * LibSQL local file-based vector database
+   * Use for local-only deployments without native bindings
+   * Advantages over FAISS: supports deletion, filtering, pure JS
+   */
+  LIBSQL_LOCAL = 'libsql',
 }
 
 /**
@@ -89,6 +98,7 @@ export interface VectorDatabaseConfig {
   [VectorDatabaseType.MILVUS_RESTFUL]: MilvusRestfulConfig
   [VectorDatabaseType.QDRANT_GRPC]: QdrantConfig
   [VectorDatabaseType.FAISS_LOCAL]: FaissConfig
+  [VectorDatabaseType.LIBSQL_LOCAL]: LibSQLConfig
 }
 
 /**
@@ -135,6 +145,12 @@ export class VectorDatabaseFactory {
    *     VectorDatabaseType.FAISS_LOCAL,
    *     { storageDir: '~/.context/faiss-indexes' }
    * );
+   *
+   * // Create LibSQL local database
+   * const libsqlDB = VectorDatabaseFactory.create(
+   *     VectorDatabaseType.LIBSQL_LOCAL,
+   *     { storageDir: '~/.context/libsql-indexes' }
+   * );
    * ```
    */
   static create<T extends VectorDatabaseType>(
@@ -156,10 +172,13 @@ export class VectorDatabaseFactory {
           throw new Error(
             `FAISS vector database is not available. ${faissCheckError || 'Native bindings could not be loaded'}. `
             + 'This usually happens in environments without C++ build tools. '
-            + 'Please use another vector database type (MILVUS_GRPC, MILVUS_RESTFUL, or QDRANT_GRPC).',
+            + 'Please use another vector database type (MILVUS_GRPC, MILVUS_RESTFUL, QDRANT_GRPC, or LIBSQL_LOCAL).',
           )
         }
         return new FaissVectorDatabase(config as FaissConfig)
+
+      case VectorDatabaseType.LIBSQL_LOCAL:
+        return new LibSQLVectorDatabase(config as LibSQLConfig)
 
       default:
         throw new Error(`Unsupported database type: ${type}`)
@@ -173,7 +192,7 @@ export class VectorDatabaseFactory {
   static getSupportedTypes(): VectorDatabaseType[] {
     const types = Object.values(VectorDatabaseType)
     if (!checkFaissAvailability()) {
-      return types.filter(t => t !== VectorDatabaseType.FAISS_LOCAL)
+      return types.filter((t) => t !== VectorDatabaseType.FAISS_LOCAL)
     }
     return types
   }

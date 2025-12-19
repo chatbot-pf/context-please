@@ -216,31 +216,18 @@ export class SimpleBM25 implements SparseVectorGenerator {
     }
 
     // Ensure all values are positive (Qdrant requirement for sparse vectors)
-    // If there are negative values, shift all values by the minimum
+    // If there are negative values, shift all values so minimum becomes a small positive
     if (values.length > 0) {
       const minValue = Math.min(...values)
-      if (minValue < 0) {
-        console.log(`[SimpleBM25] Shifting values by ${-minValue} to ensure positivity`)
+      if (minValue <= 0) {
+        // Shift so minimum becomes epsilon (not 0, to preserve all terms)
+        const epsilon = 1e-6
+        const shift = -minValue + epsilon
+        console.log(`[SimpleBM25] Shifting values by ${shift} to ensure positivity`)
         for (let i = 0; i < values.length; i++) {
-          values[i] -= minValue // Subtract negative min makes all positive
+          values[i] += shift
         }
       }
-
-      // Filter out zero values (sparse vectors should not contain zeros)
-      const filtered: { idx: number, val: number }[] = []
-      for (let i = 0; i < indices.length; i++) {
-        if (values[i] > 0) {
-          filtered.push({ idx: indices[i], val: values[i] })
-        }
-      }
-
-      // Replace arrays with filtered values
-      indices.length = 0
-      values.length = 0
-      filtered.forEach(({ idx, val }) => {
-        indices.push(idx)
-        values.push(val)
-      })
     }
 
     // Normalize if requested

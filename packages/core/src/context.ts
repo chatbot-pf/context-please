@@ -637,8 +637,8 @@ export class Context {
       // Warn if we hit the query limit - actual collection may be larger
       if (totalChunks === 100000) {
         console.warn(
-          `[Context] ⚠️  Retrieved maximum limit of 100k chunks for ${codebasePath}. ` +
-          `Actual total may be higher. Stats may be incomplete.`,
+          `[Context] ⚠️  Retrieved maximum limit of 100k chunks for ${codebasePath}. `
+          + `Actual total may be higher. Stats may be incomplete.`,
         )
       }
 
@@ -659,11 +659,11 @@ export class Context {
 
       // Log with full context for debugging
       console.error(
-        `[Context] ❌ Failed to retrieve collection stats\n` +
-        `  Codebase: ${codebasePath}\n` +
-        `  Collection: ${collectionName}\n` +
-        `  Database: ${dbType}\n` +
-        `  Error:`,
+        `[Context] ❌ Failed to retrieve collection stats\n`
+        + `  Codebase: ${codebasePath}\n`
+        + `  Collection: ${collectionName}\n`
+        + `  Database: ${dbType}\n`
+        + `  Error:`,
         error,
       )
 
@@ -673,9 +673,9 @@ export class Context {
 
         // Known recoverable errors that should return null
         if (
-          errorMsg.includes('collection not loaded') ||
-          errorMsg.includes('collection not exist') ||
-          errorMsg.includes('Failed to query')
+          errorMsg.includes('collection not loaded')
+          || errorMsg.includes('collection not exist')
+          || errorMsg.includes('Failed to query')
         ) {
           console.warn(`[Context] ⚠️  Collection exists but query failed (recoverable): ${errorMsg}`)
           return null

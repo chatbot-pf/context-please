@@ -1,7 +1,7 @@
+import * as os from 'node:os'
+import * as path from 'node:path'
 import { IndexFlatL2 } from 'faiss-node'
 import * as fs from 'fs-extra'
-import * as os from 'os'
-import * as path from 'path'
 
 import { BaseDatabaseConfig, BaseVectorDatabase } from './base/base-vector-database'
 import { BM25Config, SimpleBM25 } from './sparse/simple-bm25'
@@ -690,7 +690,9 @@ export class FaissVectorDatabase extends BaseVectorDatabase<FaissConfig> {
     results: Map<string, number>,
   ): void {
     const ntotal = collection.index.ntotal()
-    if (ntotal === 0) return
+    if (ntotal === 0) {
+      return
+    }
 
     const topK = Math.min(limit * 2, ntotal)
     const searchResults = collection.index.search(queryVector, topK)
@@ -716,7 +718,9 @@ export class FaissVectorDatabase extends BaseVectorDatabase<FaissConfig> {
     queryText: string,
     results: Map<string, number>,
   ): void {
-    if (!collection.bm25) return
+    if (!collection.bm25) {
+      return
+    }
 
     // Generate query vector once (outside the loop)
     const queryVector = collection.bm25.generate(queryText)
@@ -899,12 +903,24 @@ export class FaissVectorDatabase extends BaseVectorDatabase<FaissConfig> {
     for (const doc of collection.documents.values()) {
       const result: Record<string, any> = {}
       for (const field of outputFields) {
-        if (field === 'id') result.id = doc.id
-        else if (field === 'content') result.content = doc.content
-        else if (field === 'relativePath') result.relativePath = doc.relativePath
-        else if (field === 'startLine') result.startLine = doc.startLine
-        else if (field === 'endLine') result.endLine = doc.endLine
-        else if (field === 'fileExtension') result.fileExtension = doc.fileExtension
+        if (field === 'id') {
+          result.id = doc.id
+        }
+        else if (field === 'content') {
+          result.content = doc.content
+        }
+        else if (field === 'relativePath') {
+          result.relativePath = doc.relativePath
+        }
+        else if (field === 'startLine') {
+          result.startLine = doc.startLine
+        }
+        else if (field === 'endLine') {
+          result.endLine = doc.endLine
+        }
+        else if (field === 'fileExtension') {
+          result.fileExtension = doc.fileExtension
+        }
         else if (doc.metadata[field] !== undefined) {
           result[field] = doc.metadata[field]
         }

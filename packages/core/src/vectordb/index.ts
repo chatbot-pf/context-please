@@ -7,7 +7,9 @@ export { VectorDatabaseFactory, VectorDatabaseType } from './factory'
 export type { VectorDatabaseConfig } from './factory'
 // Implementation class exports
 export type { FaissConfig } from './faiss-vectordb'
+export { LibSQLConfig, LibSQLVectorDatabase } from './libsql-vectordb'
 export { MilvusRestfulConfig, MilvusRestfulVectorDatabase } from './milvus-restful-vectordb'
+
 export { MilvusConfig, MilvusVectorDatabase } from './milvus-vectordb'
 
 export { QdrantConfig, QdrantVectorDatabase } from './qdrant-vectordb'
@@ -23,8 +25,8 @@ catch (error: any) {
   const errorMsg = error.message || String(error)
   // Allow FAISS to be unavailable (bindings or module not found)
   if (errorMsg.includes('Could not locate the bindings file')
-      || errorMsg.includes('faiss-node')
-      || errorMsg.includes('Cannot find module')) {
+    || errorMsg.includes('faiss-node')
+    || errorMsg.includes('Cannot find module')) {
     // FAISS not available, don't export it
     console.warn('[vectordb/index] FAISS not available - FaissVectorDatabase not exported')
   }
