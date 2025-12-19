@@ -524,7 +524,7 @@ export class LibSQLVectorDatabase extends BaseVectorDatabase<LibSQLConfig> {
 
     // Train BM25 on all documents (existing + new)
     const existingResult = await client.execute('SELECT content FROM documents')
-    const existingContents = existingResult.rows.map((r) => r.content as string)
+    const existingContents = existingResult.rows.map((r: Record<string, unknown>) => r.content as string)
     const allContents = [...existingContents, ...documents.map((d) => d.content)]
     bm25.learn(allContents)
 
@@ -662,7 +662,7 @@ export class LibSQLVectorDatabase extends BaseVectorDatabase<LibSQLConfig> {
     })
 
     const results: HybridSearchResult[] = []
-    const docMap = new Map(docsResult.rows.map((row) => [row.id as string, row]))
+    const docMap = new Map(docsResult.rows.map((row: Record<string, unknown>) => [row.id as string, row]))
 
     for (const id of topIds) {
       const row = docMap.get(id)
@@ -874,7 +874,7 @@ export class LibSQLVectorDatabase extends BaseVectorDatabase<LibSQLConfig> {
       const bm25 = this.bm25Generators.get(collectionName)
       if (bm25) {
         const result = await client.execute('SELECT content FROM documents')
-        const contents = result.rows.map((r) => r.content as string)
+        const contents = result.rows.map((r: Record<string, unknown>) => r.content as string)
         if (contents.length > 0) {
           bm25.learn(contents)
           await this.saveBM25(collectionName)
@@ -920,7 +920,7 @@ export class LibSQLVectorDatabase extends BaseVectorDatabase<LibSQLConfig> {
 
     const result = await client.execute({ sql, args })
 
-    return result.rows.map((row) => this.rowToResult(row, outputFields))
+    return result.rows.map((row: Record<string, unknown>) => this.rowToResult(row, outputFields))
   }
 
   /**
