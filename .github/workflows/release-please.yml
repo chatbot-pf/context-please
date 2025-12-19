@@ -2,6 +2,13 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      publish_only:
+        description: 'Skip release-please and only publish packages'
+        required: false
+        default: 'false'
+        type: boolean
 
 permissions:
   contents: write
@@ -12,6 +19,7 @@ name: release-please
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' || inputs.publish_only != true }}
     outputs:
       releases_created: ${{ steps.release.outputs.releases_created }}
       core_released: ${{ steps.release.outputs['packages/core--release_created'] }}
@@ -31,7 +39,7 @@ jobs:
 
   publish:
     needs: release-please
-    if: ${{ needs.release-please.outputs.releases_created == 'true' }}
+    if: ${{ always() && (needs.release-please.outputs.releases_created == 'true' || inputs.publish_only == true) }}
     runs-on: ubuntu-latest
     environment: npm
     permissions:
@@ -49,7 +57,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22.x'
+          node-version: '24.x'
           cache: 'pnpm'
           registry-url: 'https://registry.npmjs.org'
 
@@ -59,12 +67,13 @@ jobs:
       - name: Build packages
         run: pnpm build
 
+      # IMPORTANT: Use pnpm publish (not npm publish) to resolve workspace: protocols
+      # pnpm automatically converts workspace:* to actual version numbers during publish
+      # See: https://pnpm.io/cli/publish and https://github.com/pnpm/pnpm/issues/9812
       - name: Publish core package to npm
-        if: ${{ needs.release-please.outputs.core_released == 'true' }}
-        working-directory: packages/core
-        run: npm publish --provenance --access public
+        if: ${{ needs.release-please.outputs.core_released == 'true' || inputs.publish_only == true }}
+        run: pnpm --filter @pleaseai/context-please-core publish --access public --no-git-checks
 
       - name: Publish mcp package to npm
-        if: ${{ needs.release-please.outputs.mcp_released == 'true' }}
-        working-directory: packages/mcp
-        run: npm publish --provenance --access public
+        if: ${{ needs.release-please.outputs.mcp_released == 'true' || inputs.publish_only == true }}
+        run: pnpm --filter @pleaseai/context-please-mcp publish --access public --no-git-checks
