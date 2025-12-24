@@ -63,14 +63,16 @@ class ContextMcpServer {
     // See: https://github.com/pleaseai/context-please/issues/62
     let vectorDatabase: VectorDatabase
 
-    const hasExternalDb = config.milvusAddress || config.milvusToken || config.qdrantUrl
+    const hasMilvusConfig = config.milvusAddress || config.milvusToken
+    const hasQdrantConfig = config.qdrantUrl
     const faissAvailable = VectorDatabaseFactory.isFaissAvailable()
 
     // Log configuration for debugging vector database selection
     console.log(`[VECTORDB] 🔍 Configuration:`)
     console.log(`[VECTORDB]   VECTOR_DB_TYPE env: ${process.env.VECTOR_DB_TYPE || 'NOT SET'}`)
     console.log(`[VECTORDB]   config.vectorDbType: ${config.vectorDbType}`)
-    console.log(`[VECTORDB]   hasExternalDb: ${!!hasExternalDb}`)
+    console.log(`[VECTORDB]   hasMilvusConfig: ${!!hasMilvusConfig}`)
+    console.log(`[VECTORDB]   hasQdrantConfig: ${!!hasQdrantConfig}`)
     console.log(`[VECTORDB]   faissAvailable: ${faissAvailable}`)
 
     // EXPLICIT handling: Check for 'milvus' FIRST to ensure user intent is respected
@@ -160,7 +162,7 @@ class ContextMcpServer {
       if (!faissAvailable) {
         throw new Error(
           'FAISS vector database was explicitly requested but native bindings are not available. '
-          + 'Please use VECTOR_DB_TYPE=milvus or VECTOR_DB_TYPE=qdrant instead.',
+          + 'Please use VECTOR_DB_TYPE=milvus, VECTOR_DB_TYPE=qdrant, or VECTOR_DB_TYPE=libsql instead.',
         )
       }
       console.log('[VECTORDB] ✅ Using FAISS (explicitly configured, local file-based)')
@@ -179,20 +181,10 @@ class ContextMcpServer {
         )
       }
     }
-    else if (hasExternalDb) {
-      // No explicit VECTOR_DB_TYPE, but external database config present
-      // Check for ambiguous configuration (QDRANT_URL set without Milvus config)
-      if (config.qdrantUrl && !config.milvusAddress && !config.milvusToken) {
-        console.error(`[VECTORDB] ❌ Ambiguous configuration: QDRANT_URL is set but VECTOR_DB_TYPE is not 'qdrant'.`)
-        throw new Error(
-          `Ambiguous vector database configuration detected. `
-          + `QDRANT_URL is set but VECTOR_DB_TYPE is not specified. `
-          + `Please set VECTOR_DB_TYPE=qdrant to use Qdrant, or remove QDRANT_URL if you intend to use Milvus.`,
-        )
-      }
-
+    else if (hasMilvusConfig) {
+      // No explicit VECTOR_DB_TYPE, but Milvus config present
       // Infer Milvus from MILVUS_ADDRESS/MILVUS_TOKEN for backward compatibility
-      console.log(`[VECTORDB] ⚠️  No VECTOR_DB_TYPE set, but external DB config detected. Defaulting to Milvus.`)
+      console.log(`[VECTORDB] ⚠️  No VECTOR_DB_TYPE set, but Milvus config detected. Defaulting to Milvus.`)
       console.log(`[VECTORDB] ✅ Using Milvus (inferred from config): ${config.milvusAddress || 'auto-resolve from token'}`)
       try {
         vectorDatabase = new MilvusVectorDatabase({
@@ -209,6 +201,15 @@ class ContextMcpServer {
           + `Please verify MILVUS_ADDRESS and MILVUS_TOKEN are correct, or set VECTOR_DB_TYPE explicitly.`,
         )
       }
+    }
+    else if (hasQdrantConfig) {
+      // QDRANT_URL is set but VECTOR_DB_TYPE is not 'qdrant'
+      // Unlike Milvus, we don't auto-infer Qdrant to maintain backward compatibility
+      console.error(`[VECTORDB] ❌ QDRANT_URL is set but VECTOR_DB_TYPE is not 'qdrant'.`)
+      throw new Error(
+        `QDRANT_URL is configured but VECTOR_DB_TYPE is not set to 'qdrant'. `
+        + `Please set VECTOR_DB_TYPE=qdrant to use Qdrant.`,
+      )
     }
     else {
       // No explicit config and no external DB - use FAISS for zero-config local development
