@@ -1,7 +1,7 @@
 {
   "name": "@pleaseai/context-please-mcp",
   "type": "module",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Model Context Protocol integration for Context Please (fork of claude-context-mcp)",
   "license": "MIT",
   "repository": {

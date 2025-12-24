@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.6.0](https://github.com/pleaseai/context-please/compare/mcp-v0.5.0...mcp-v0.6.0) (2025-12-19)
+
+
+### Features
+
+* **core,mcp:** add LibSQL vector database support for local-only deployments ([#56](https://github.com/pleaseai/context-please/issues/56)) ([0df83cb](https://github.com/pleaseai/context-please/commit/0df83cb5416629a9bca6dfc08371033525785468))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @pleaseai/context-please-core bumped to 0.7.0
+
 ## [0.5.0](https://github.com/pleaseai/context-please/compare/mcp-v0.4.1...mcp-v0.5.0) (2025-12-19)
 
 
