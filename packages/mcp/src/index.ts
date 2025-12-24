@@ -59,48 +59,58 @@ class ContextMcpServer {
     logEmbeddingProviderInfo(config, embedding)
 
     // Initialize vector database based on configuration
-    // Auto-select FAISS if no external database is configured and FAISS is available
+    // EXPLICIT handling for each database type to prevent default fallback issues
+    // See: https://github.com/pleaseai/context-please/issues/62
     let vectorDatabase: VectorDatabase
 
-    const hasExternalDb = config.milvusAddress || config.milvusToken || config.qdrantUrl
+    const hasMilvusConfig = config.milvusAddress || config.milvusToken
+    const hasQdrantConfig = config.qdrantUrl
     const faissAvailable = VectorDatabaseFactory.isFaissAvailable()
 
-    if (!hasExternalDb && !config.vectorDbType) {
-      // Default to FAISS for zero-config local development (if available)
-      if (faissAvailable) {
-        console.log('[VECTORDB] No external vector database configured, using FAISS (local file-based)')
-        vectorDatabase = VectorDatabaseFactory.create(VectorDatabaseType.FAISS_LOCAL, {
-          storageDir: process.env.FAISS_STORAGE_DIR,
+    // Log configuration for debugging vector database selection
+    console.log(`[VECTORDB] 🔍 Configuration:`)
+    console.log(`[VECTORDB]   VECTOR_DB_TYPE env: ${process.env.VECTOR_DB_TYPE || 'NOT SET'}`)
+    console.log(`[VECTORDB]   config.vectorDbType: ${config.vectorDbType}`)
+    console.log(`[VECTORDB]   hasMilvusConfig: ${!!hasMilvusConfig}`)
+    console.log(`[VECTORDB]   hasQdrantConfig: ${!!hasQdrantConfig}`)
+    console.log(`[VECTORDB]   faissAvailable: ${faissAvailable}`)
+
+    // EXPLICIT handling: Check for 'milvus' FIRST to ensure user intent is respected
+    if (config.vectorDbType === 'milvus') {
+      // User explicitly requested Milvus via VECTOR_DB_TYPE=milvus
+      console.log(`[VECTORDB] ✅ Using Milvus (explicitly configured): ${config.milvusAddress || 'auto-resolve from token'}`)
+      try {
+        vectorDatabase = new MilvusVectorDatabase({
+          address: config.milvusAddress,
+          ...(config.milvusToken && { token: config.milvusToken }),
         })
       }
-      else {
-        // FAISS not available, require explicit configuration
-        console.error('[VECTORDB] ❌ No vector database configured and FAISS is not available.')
-        console.error('[VECTORDB] Please configure one of the following:')
-        console.error('[VECTORDB]   - MILVUS_ADDRESS or MILVUS_TOKEN for Milvus')
-        console.error('[VECTORDB]   - QDRANT_URL for Qdrant')
+      catch (error: any) {
+        console.error(`[VECTORDB] ❌ Failed to initialize Milvus:`, error.message)
         throw new Error(
-          'No vector database configured. FAISS native bindings are not available in this environment. '
-          + 'Please set MILVUS_ADDRESS/MILVUS_TOKEN or QDRANT_URL to use an external vector database.',
+          `Failed to initialize Milvus vector database. `
+          + `Address: ${config.milvusAddress || 'auto-resolve from token'}. `
+          + `Error: ${error.message}. `
+          + `Please verify MILVUS_ADDRESS and MILVUS_TOKEN are correct and the server is accessible.`,
         )
       }
-    }
-    else if (config.vectorDbType === 'faiss-local') {
-      if (!faissAvailable) {
-        throw new Error(
-          'FAISS vector database was explicitly requested but native bindings are not available. '
-          + 'Please use VECTOR_DB_TYPE=milvus or VECTOR_DB_TYPE=qdrant instead.',
-        )
-      }
-      console.log('[VECTORDB] Using FAISS (local file-based)')
-      vectorDatabase = VectorDatabaseFactory.create(VectorDatabaseType.FAISS_LOCAL, {
-        storageDir: process.env.FAISS_STORAGE_DIR,
-      })
     }
     else if (config.vectorDbType === 'qdrant') {
+      // User explicitly requested Qdrant via VECTOR_DB_TYPE=qdrant
       // Parse Qdrant URL to get address for gRPC
       const qdrantUrl = config.qdrantUrl || 'http://localhost:6333'
-      const url = new URL(qdrantUrl.startsWith('http') ? qdrantUrl : `http://${qdrantUrl}`)
+
+      // Validate URL format
+      let url: URL
+      try {
+        url = new URL(qdrantUrl.startsWith('http') ? qdrantUrl : `http://${qdrantUrl}`)
+      }
+      catch {
+        throw new Error(
+          `Invalid QDRANT_URL format: '${qdrantUrl}'. `
+          + `Please provide a valid URL (e.g., 'http://localhost:6333' or 'localhost:6333').`,
+        )
+      }
 
       // For Qdrant gRPC, we need host:port format.
       // Auto-convert default REST port (6333) to default gRPC port (6334).
@@ -111,28 +121,131 @@ class ContextMcpServer {
       }
       const grpcAddress = `${url.hostname}:${grpcPort}`
 
-      console.log(`[VECTORDB] Qdrant gRPC address: ${grpcAddress}`)
+      console.log(`[VECTORDB] ✅ Using Qdrant (explicitly configured): ${grpcAddress}`)
 
-      vectorDatabase = new QdrantVectorDatabase({
-        address: grpcAddress,
-        ...(config.qdrantApiKey && { apiKey: config.qdrantApiKey }),
-      })
+      try {
+        vectorDatabase = new QdrantVectorDatabase({
+          address: grpcAddress,
+          ...(config.qdrantApiKey && { apiKey: config.qdrantApiKey }),
+        })
+      }
+      catch (error: any) {
+        console.error(`[VECTORDB] ❌ Failed to initialize Qdrant:`, error.message)
+        throw new Error(
+          `Failed to initialize Qdrant vector database. `
+          + `Address: ${grpcAddress}. `
+          + `Error: ${error.message}. `
+          + `Please verify QDRANT_URL is correct and the server is accessible.`,
+        )
+      }
     }
     else if (config.vectorDbType === 'libsql') {
-      // LibSQL local database - pure JavaScript, no native bindings required
-      console.log('[VECTORDB] Using LibSQL (local file-based, pure JS)')
-      vectorDatabase = new LibSQLVectorDatabase({
-        storageDir: process.env.LIBSQL_STORAGE_DIR,
-      })
+      // User explicitly requested LibSQL via VECTOR_DB_TYPE=libsql
+      console.log('[VECTORDB] ✅ Using LibSQL (explicitly configured, pure JS)')
+      try {
+        vectorDatabase = new LibSQLVectorDatabase({
+          storageDir: process.env.LIBSQL_STORAGE_DIR,
+        })
+      }
+      catch (error: any) {
+        console.error(`[VECTORDB] ❌ Failed to initialize LibSQL:`, error.message)
+        throw new Error(
+          `Failed to initialize LibSQL vector database. `
+          + `Storage directory: ${process.env.LIBSQL_STORAGE_DIR || '~/.context/libsql-indexes'}. `
+          + `Error: ${error.message}. `
+          + `Please verify the storage directory is accessible and has write permissions.`,
+        )
+      }
+    }
+    else if (config.vectorDbType === 'faiss-local') {
+      // User explicitly requested FAISS via VECTOR_DB_TYPE=faiss-local
+      if (!faissAvailable) {
+        throw new Error(
+          'FAISS vector database was explicitly requested but native bindings are not available. '
+          + 'Please use VECTOR_DB_TYPE=milvus, VECTOR_DB_TYPE=qdrant, or VECTOR_DB_TYPE=libsql instead.',
+        )
+      }
+      console.log('[VECTORDB] ✅ Using FAISS (explicitly configured, local file-based)')
+      try {
+        vectorDatabase = VectorDatabaseFactory.create(VectorDatabaseType.FAISS_LOCAL, {
+          storageDir: process.env.FAISS_STORAGE_DIR,
+        })
+      }
+      catch (error: any) {
+        console.error(`[VECTORDB] ❌ Failed to initialize FAISS:`, error.message)
+        throw new Error(
+          `Failed to initialize FAISS vector database. `
+          + `Storage directory: ${process.env.FAISS_STORAGE_DIR || '~/.context/faiss-indexes'}. `
+          + `Error: ${error.message}. `
+          + `Please verify the storage directory is accessible and has write permissions.`,
+        )
+      }
+    }
+    else if (hasMilvusConfig) {
+      // No explicit VECTOR_DB_TYPE, but Milvus config present
+      // Infer Milvus from MILVUS_ADDRESS/MILVUS_TOKEN for backward compatibility
+      console.log(`[VECTORDB] ⚠️  No VECTOR_DB_TYPE set, but Milvus config detected. Defaulting to Milvus.`)
+      console.log(`[VECTORDB] ✅ Using Milvus (inferred from config): ${config.milvusAddress || 'auto-resolve from token'}`)
+      try {
+        vectorDatabase = new MilvusVectorDatabase({
+          address: config.milvusAddress,
+          ...(config.milvusToken && { token: config.milvusToken }),
+        })
+      }
+      catch (error: any) {
+        console.error(`[VECTORDB] ❌ Failed to initialize Milvus:`, error.message)
+        throw new Error(
+          `Failed to initialize Milvus vector database (inferred from config). `
+          + `Address: ${config.milvusAddress || 'auto-resolve from token'}. `
+          + `Error: ${error.message}. `
+          + `Please verify MILVUS_ADDRESS and MILVUS_TOKEN are correct, or set VECTOR_DB_TYPE explicitly.`,
+        )
+      }
+    }
+    else if (hasQdrantConfig) {
+      // QDRANT_URL is set but VECTOR_DB_TYPE is not 'qdrant'
+      // Unlike Milvus, we don't auto-infer Qdrant to maintain backward compatibility
+      console.error(`[VECTORDB] ❌ QDRANT_URL is set but VECTOR_DB_TYPE is not 'qdrant'.`)
+      throw new Error(
+        `QDRANT_URL is configured but VECTOR_DB_TYPE is not set to 'qdrant'. `
+        + `Please set VECTOR_DB_TYPE=qdrant to use Qdrant.`,
+      )
     }
     else {
-      // Default to Milvus
-      console.log(`[VECTORDB] Using Milvus: ${config.milvusAddress || 'default'}`)
-      vectorDatabase = new MilvusVectorDatabase({
-        address: config.milvusAddress,
-        ...(config.milvusToken && { token: config.milvusToken }),
-      })
+      // No explicit config and no external DB - use FAISS for zero-config local development
+      if (faissAvailable) {
+        console.log('[VECTORDB] ✅ Using FAISS (default for local development)')
+        try {
+          vectorDatabase = VectorDatabaseFactory.create(VectorDatabaseType.FAISS_LOCAL, {
+            storageDir: process.env.FAISS_STORAGE_DIR,
+          })
+        }
+        catch (error: any) {
+          console.error(`[VECTORDB] ❌ Failed to initialize FAISS:`, error.message)
+          throw new Error(
+            `Failed to initialize FAISS vector database (default). `
+            + `Storage directory: ${process.env.FAISS_STORAGE_DIR || '~/.context/faiss-indexes'}. `
+            + `Error: ${error.message}. `
+            + `Please verify the storage directory is accessible, or configure an external database.`,
+          )
+        }
+      }
+      else {
+        // FAISS not available, require explicit configuration
+        console.error('[VECTORDB] ❌ No vector database configured and FAISS is not available.')
+        console.error('[VECTORDB] Please configure one of the following:')
+        console.error('[VECTORDB]   - VECTOR_DB_TYPE=milvus with MILVUS_ADDRESS or MILVUS_TOKEN')
+        console.error('[VECTORDB]   - VECTOR_DB_TYPE=qdrant with QDRANT_URL')
+        console.error('[VECTORDB]   - VECTOR_DB_TYPE=libsql for local pure JS storage')
+        throw new Error(
+          'No vector database configured. FAISS native bindings are not available in this environment. '
+          + 'Please set VECTOR_DB_TYPE and corresponding configuration.',
+        )
+      }
     }
+
+    // Log final vector database selection for verification
+    console.log(`[VECTORDB] 🎯 Final selection: ${vectorDatabase.constructor.name}`)
 
     // Initialize Claude Context
     this.context = new Context({
